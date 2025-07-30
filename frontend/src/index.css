@@ -1,0 +1,140 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply m-0 font-sans bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white;
+  }
+
+  ::selection {
+    @apply bg-primary-light/30 text-gray-900 dark:text-white;
+  }
+
+  input, button, select {
+    @apply w-full my-1 px-4 py-2 border-0 rounded font-sans bg-white dark:bg-gray-800 text-gray-900 dark:text-white;
+  }
+
+  input::placeholder {
+    @apply text-gray-500 dark:text-gray-400;
+  }
+
+  select {
+    @apply bg-white dark:bg-gray-800 text-gray-900 dark:text-white cursor-pointer;
+  }
+
+  button {
+    @apply bg-primary text-white cursor-pointer hover:bg-primary-light transition-colors;
+  }
+
+  table {
+    @apply w-full border-collapse mt-4;
+  }
+
+  td, th {
+    @apply border border-gray-300 dark:border-gray-600 p-2 text-left;
+  }
+}
+
+@layer components {
+  .center {
+    @apply container mx-auto px-4 py-8;
+  }
+
+  .card-list {
+    @apply grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 p-0 list-none;
+  }
+
+  .card {
+    @apply bg-white dark:bg-gray-800 p-4 rounded-lg shadow-md;
+  }
+
+  .booking-list {
+    @apply flex flex-col gap-6;
+  }
+
+  .booking-card {
+    @apply bg-white dark:bg-gray-800 p-6 rounded-lg shadow-md;
+  }
+
+  .booking-header {
+    @apply flex justify-between items-center mb-4;
+  }
+
+  .booking-details {
+    @apply grid gap-4;
+  }
+
+  .booking-section {
+    @apply mb-6;
+  }
+
+  .booking-section h3 {
+    @apply mb-2 text-primary;
+  }
+
+  .booking-actions {
+    @apply flex gap-4 mt-4;
+  }
+
+  .booking-actions a {
+    @apply text-primary no-underline px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors;
+  }
+
+  .status-badge {
+    @apply inline-flex px-3 py-1 rounded text-sm font-semibold;
+  }
+
+  .status-badge.booked {
+    @apply bg-primary text-white dark:bg-primary-dark;
+  }
+
+  .status-badge.occupied {
+    @apply bg-primary text-white dark:bg-primary-dark;
+  }
+
+  .status-badge.completed {
+    @apply bg-primary text-white dark:bg-primary-dark;
+  }
+
+  .status-badge.canceled {
+    @apply bg-error text-white;
+  }
+
+  .payment-status {
+    @apply inline-flex px-3 py-1 rounded text-sm font-semibold;
+  }
+
+  .payment-status.pending {
+    @apply bg-warning text-white;
+  }
+
+  .payment-status.approved {
+    @apply bg-success text-white;
+  }
+
+  .payment-status.declined {
+    @apply bg-error text-white;
+  }
+
+  .cancel-button {
+    @apply bg-error text-white hover:bg-red-600 transition-colors;
+  }
+
+  .err {
+    @apply text-error;
+  }
+
+  .ok {
+    @apply text-success;
+  }
+
+  .dates {
+    @apply flex flex-col gap-2;
+  }
+
+  .dates label {
+    @apply text-gray-700 dark:text-gray-300;
+  }
+}
+
