@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  deploy:
+  build-backend-docker-image-and-deploy-to-cloud-run:
     runs-on: ubuntu-latest
     environment: ExpressJS Server
     steps:
