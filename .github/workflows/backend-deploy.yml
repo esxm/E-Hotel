@@ -53,7 +53,7 @@ jobs:
             --image "${{ secrets.GCP_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.REGISTRY_ARTIFACTS_REPOSITORY_NAME }}/my-github-action:latest" \
             --platform managed \
             --region ${{ secrets.GCP_LOCATION }} \
-            --port ${{ secrets.PORT }}
+            --port ${{ secrets.BACKEND_PORT }}
             --project ${{ secrets.GCP_PROJECT_ID }} \
             --service-account ${{ secrets.GCP_BACKEND_DEPLOYMENT_SA_NAME }} \
             --set-env-vars="FIREBASE_SDK_SA_KEY=/app/credentials/firebase-sdk-sa-key.json,FIRESTORE_DATABASE_ID=${{ secrets.FIRESTORE_DATABASE_ID }}" \
