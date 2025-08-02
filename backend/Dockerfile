@@ -13,10 +13,25 @@ RUN npm ci --omit=dev
 # 3) Now copy the rest of your source
 COPY . .
 
-# 4) Cloud Run will always set $PORT (it defaults to 8080)
-#    So expose 8080 (EXPOSE is just documentation, but good to match your code)
+# 4) Create a non-root user for security
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S nodejs -u 1001
+
+# 5) Change ownership of the app directory
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+# 6) Set default environment variables
 ENV PORT=8080
+ENV FIRESTORE_DATABASE_ID=""
+ENV FIREBASE_SDK_SA_CREDENTIALS=""
+
+# 7) Expose port (EXPOSE is just documentation, but good to match your code)
 EXPOSE 8080
 
-# 5) Start your server (make sure your code listens on process.env.PORT)
+# 8) Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').get('http://localhost:8080/api/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })" || exit 1
+
+# 9) Start your server (make sure your code listens on process.env.PORT)
 CMD ["node", "server.js"]

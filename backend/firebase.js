@@ -12,14 +12,12 @@ try {
   let credential;
 
   // Check if service account key is provided via environment variable
-  if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  if (process.env.FIREBASE_SDK_SA_CREDENTIALS) {
     console.log(
       "🔑 Using service account credentials from environment variable:",
-      process.env.GOOGLE_APPLICATION_CREDENTIALS
+      process.env.FIREBASE_SDK_SA_CREDENTIALS
     );
-    credential = admin.credential.cert(
-      process.env.GOOGLE_APPLICATION_CREDENTIALS
-    );
+    credential = admin.credential.cert(process.env.FIREBASE_SDK_SA_CREDENTIALS);
   } else {
     // Fallback to local file (for development)
     const serviceAccountPath = path.join(

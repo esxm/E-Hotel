@@ -36,6 +36,36 @@ function mulberry32(a) {
 }
 const rand = mulberry32(42);
 
+/* realistic names for seed accounts */
+const managerNames = [
+  "Sarah Johnson",
+  "Michael Chen",
+  "Emily Rodriguez",
+  "David Thompson",
+  "Lisa Park",
+];
+
+const receptionistNames = [
+  "Jennifer Smith",
+  "Robert Wilson",
+  "Amanda Davis",
+  "Christopher Lee",
+  "Maria Garcia",
+];
+
+const customerNames = [
+  "James Brown",
+  "Emma Taylor",
+  "William Anderson",
+  "Olivia Martinez",
+  "Daniel White",
+  "Sophia Clark",
+  "Matthew Lewis",
+  "Isabella Hall",
+  "Joseph Young",
+  "Ava King",
+];
+
 /* helpers ---------------------------------------------------------------- */
 async function clear(col) {
   const snap = await db.collection(col).limit(500).get();
@@ -73,16 +103,43 @@ async function seed() {
   console.log("🔄 Clearing Firestore collections…");
   for (const c of COLLECTIONS) await clear(c);
 
-  /* 1. get (or create) 20 users */
-  let users = await fetchFirstNUsers(20);
+  console.log("🔄 Clearing Firebase Auth users…");
+  // Delete all existing Firebase Auth users
+  let nextPageToken;
+  do {
+    const page = await admin.auth().listUsers(1000, nextPageToken);
+    if (page.users.length > 0) {
+      const uids = page.users.map((user) => user.uid);
+      await admin.auth().deleteUsers(uids);
+      console.log(`Deleted ${uids.length} Firebase Auth users`);
+    }
+    nextPageToken = page.pageToken;
+  } while (nextPageToken);
 
-  // If we still have <20, create temp accounts
-  while (users.length < 20) {
-    const i = users.length + 1;
-    const email = `seed-user-${i}@example.com`;
-    const temp = await admin
-      .auth()
-      .createUser({ email, password: "Passw0rd!" });
+  /* 1. Create 20 users with realistic names */
+  let users = [];
+
+  // Create managers
+  for (let i = 0; i < 5; i++) {
+    const name = managerNames[i];
+    const email = `${name.toLowerCase().replace(" ", ".")}@hotel.com`;
+    const temp = await admin.auth().createUser({ email, password: "123456" });
+    users.push(await admin.auth().getUser(temp.uid));
+  }
+
+  // Create receptionists
+  for (let i = 0; i < 5; i++) {
+    const name = receptionistNames[i];
+    const email = `${name.toLowerCase().replace(" ", ".")}@hotel.com`;
+    const temp = await admin.auth().createUser({ email, password: "123456" });
+    users.push(await admin.auth().getUser(temp.uid));
+  }
+
+  // Create customers
+  for (let i = 0; i < 10; i++) {
+    const name = customerNames[i];
+    const email = `${name.toLowerCase().replace(" ", ".")}@example.com`;
+    const temp = await admin.auth().createUser({ email, password: "123456" });
     users.push(await admin.auth().getUser(temp.uid));
   }
 
@@ -96,28 +153,22 @@ async function seed() {
   for (let i = 0; i < managers.length; i++) {
     const u = managers[i];
     await ensureRole(u.uid, "HotelManager");
-    await db
-      .collection("hotelManagers")
-      .doc(u.uid)
-      .set({
-        name: `Manager ${i + 1}`,
-        email: u.email,
-        hotelID: null, // assigned below
-      });
+    await db.collection("hotelManagers").doc(u.uid).set({
+      name: managerNames[i],
+      email: u.email,
+      hotelID: null, // assigned below
+    });
   }
 
   console.log("✨ Receptionists");
   for (let i = 0; i < receptionists.length; i++) {
     const u = receptionists[i];
     await ensureRole(u.uid, "Receptionist");
-    await db
-      .collection("receptionists")
-      .doc(u.uid)
-      .set({
-        name: `Receptionist ${i + 1}`,
-        email: u.email,
-        hotelID: null, // assigned below
-      });
+    await db.collection("receptionists").doc(u.uid).set({
+      name: receptionistNames[i],
+      email: u.email,
+      hotelID: null, // assigned below
+    });
   }
 
   console.log("✨ Customers");
@@ -128,7 +179,7 @@ async function seed() {
       .collection("customers")
       .doc(u.uid)
       .set({
-        name: `Customer ${i + 1}`,
+        name: customerNames[i],
         phoneNumber: `+123456789${i}`,
         idType: ["passport", "id_card", "driver_license"][i % 3],
         idNumber: `ID${i + 1}`,

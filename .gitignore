@@ -137,8 +137,7 @@ dist
 
 serviceAccountKey.json
 
-GCP_SA_KEY.json
-firebase-sa.json
+backend/credentials/*
 
 .cursor/
 .cursorignore
