@@ -11,39 +11,30 @@ const dbId = process.env.FIRESTORE_DATABASE_ID; // e.g. "e-hotel" or "e-hotel-sd
 try {
   let credential;
 
-  // Check if service account key is provided via environment variable
-  if (process.env.FIREBASE_SDK_SA_CREDENTIALS) {
+  // Check if service account key path is provided via environment variable
+  if (process.env.FIREBASE_SDK_SA_KEY) {
+    const serviceAccountPath = process.env.FIREBASE_SDK_SA_KEY;
     console.log(
-      "🔑 Using service account credentials from environment variable:",
-      process.env.FIREBASE_SDK_SA_CREDENTIALS
-    );
-    credential = admin.credential.cert(process.env.FIREBASE_SDK_SA_CREDENTIALS);
-  } else {
-    // Fallback to local file (for development)
-    const serviceAccountPath = path.join(
-      process.cwd(),
-      "credentials",
-      "firebase-sa.json"
-    );
-    console.log("🔍 Looking for credentials at:", serviceAccountPath);
-    console.log(
-      "📁 Credentials directory exists:",
-      fs.existsSync(path.dirname(serviceAccountPath))
-    );
-    console.log(
-      "📄 Credentials file exists:",
-      fs.existsSync(serviceAccountPath)
+      "🔑 Using service account credentials from path:",
+      serviceAccountPath
     );
 
-    if (fs.existsSync(serviceAccountPath)) {
-      console.log(
-        "📝 Credentials file size:",
-        fs.statSync(serviceAccountPath).size,
-        "bytes"
+    if (!fs.existsSync(serviceAccountPath)) {
+      throw new Error(
+        `Firebase service account file not found at path: ${serviceAccountPath}`
       );
     }
 
+    console.log(
+      "📄 Credentials file exists and size:",
+      fs.statSync(serviceAccountPath).size,
+      "bytes"
+    );
     credential = admin.credential.cert(serviceAccountPath);
+  } else {
+    throw new Error(
+      "FIREBASE_SDK_SA_KEY environment variable is required but not set"
+    );
   }
 
   admin.initializeApp({

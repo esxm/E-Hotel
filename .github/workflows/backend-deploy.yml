@@ -8,7 +8,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
+    environment: ExpressJS Server
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -16,9 +16,9 @@ jobs:
       - name: Authenticate with Google Cloud
         uses: google-github-actions/auth@v1
         with:
-          credentials_json: ${{ secrets.GCP_SA_SERVER_DEPLOY_KEY }}
+          credentials_json: ${{ secrets.GCP_BACKEND_DEPLOYMENT_SA_KEY }}
           workload_identity_provider: ${{ secrets.WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SA_SERVER_DEPLOY_NAME }}
+          service_account: ${{ secrets.GCP_BACKEND_DEPLOYMENT_SA_NAME }}
 
       - name: Set up Google Cloud SDK
         uses: google-github-actions/setup-gcloud@v1
@@ -33,16 +33,16 @@ jobs:
       - name: Create Firebase credentials
         run: |
           mkdir -p ./backend/credentials
-          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT_E_HOTEL_INTERNSHIP }}' > ./backend/credentials/firebase-sa.json
-          chmod 644 ./backend/credentials/firebase-sa.json
+          echo '${{ secrets.FIREBASE_SDK_SA_KEY }}' > ./backend/credentials/firebase-sdk-sa-key.json
+          chmod 644 ./backend/credentials/firebase-sdk-sa-key.json
           ls -la ./backend/credentials/
           echo "Verifying service account JSON structure:"
-          cat ./backend/credentials/firebase-sa.json | jq -r '.project_id // "project_id not found"'
+          cat ./backend/credentials/firebase-sdk-sa-key.json | jq -r '.project_id // "project_id not found"'
 
       # 🚀 Build and push the image from /backend
       - name: Build and Push Docker image
         run: |
-          IMAGE_URI="${{ secrets.GCP_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.REPOSITORY_NAME }}/my-github-action:latest"
+          IMAGE_URI="${{ secrets.GCP_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.REGISTRY_ARTIFACTS_REPOSITORY_NAME }}/my-github-action:latest"
           echo "Building Docker image: $IMAGE_URI"
           docker build -t "$IMAGE_URI" ./backend
           docker push "$IMAGE_URI"
@@ -50,11 +50,11 @@ jobs:
       - name: Deploy to Cloud Run
         run: |
           gcloud run deploy github-cloud-run-service \
-            --image "${{ secrets.GCP_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.REPOSITORY_NAME }}/my-github-action:latest" \
+            --image "${{ secrets.GCP_LOCATION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/${{ secrets.REGISTRY_ARTIFACTS_REPOSITORY_NAME }}/my-github-action:latest" \
             --platform managed \
             --region ${{ secrets.GCP_LOCATION }} \
-            --port 8080 \
+            --port ${{ secrets.PORT }}
             --project ${{ secrets.GCP_PROJECT_ID }} \
-            --service-account ${{ secrets.GCP_SA_SERVER_DEPLOY_NAME }} \
-            --set-env-vars="GOOGLE_APPLICATION_CREDENTIALS=/app/credentials/firebase-sa.json,FIRESTORE_DATABASE_ID=${{ secrets.FIRESTORE_DATABASE_ID }}" \
+            --service-account ${{ secrets.GCP_BACKEND_DEPLOYMENT_SA_NAME }} \
+            --set-env-vars="FIREBASE_SDK_SA_KEY=/app/credentials/firebase-sdk-sa-key.json,FIRESTORE_DATABASE_ID=${{ secrets.FIRESTORE_DATABASE_ID }}" \
             --allow-unauthenticated

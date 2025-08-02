@@ -24,7 +24,7 @@ USER nodejs
 # 6) Set default environment variables
 ENV PORT=8080
 ENV FIRESTORE_DATABASE_ID=""
-ENV FIREBASE_SDK_SA_CREDENTIALS=""
+ENV FIREBASE_SDK_SA_KEY=""
 
 # 7) Expose port (EXPOSE is just documentation, but good to match your code)
 EXPOSE 8080
