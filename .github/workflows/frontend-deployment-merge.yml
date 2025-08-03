@@ -1,0 +1,42 @@
+name: Deploy React App to Firebase Hosting on Merge
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build-frontend-and-deploy-to-firebase-hosting:
+    runs-on: ubuntu-latest
+    environment: React App
+    steps:
+      - uses: actions/checkout@v4
+
+      # Create firebaseConfig.js from secret
+      - name: Create firebaseConfig.js
+        run: |
+          echo '${{ secrets.FIREBASE_CONFIG }}' > src/firebaseConfig.js
+        working-directory: ./frontend
+
+      # Create .firebaserc from secret
+      - name: Create .firebaserc
+        run: |
+          echo '${{ secrets.FIREBASERC }}' > .firebaserc
+        working-directory: ./frontend
+
+      # Run the install and build commands in the frontend folder
+      - name: Install and Build
+        run: |
+          touch .env
+          echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" > .env
+          npm ci && npm run build
+        working-directory: ./frontend
+        env:
+          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+
+      - name: Deploy to Firebase Hosting
+        uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_FRONTEND_DEPLOYMENT_SA_KEY }}
+          channelId: live
+          projectId: ${{ secrets.GCP_PROJECT_ID }}
+          entryPoint: ./frontend
