@@ -47,6 +47,7 @@ All analysis deliverables were created in StarUML and exported as images into th
 │  │  ├─ firebase.js
 │  │  └─ firebaseConfig.js
 │  ├─ .env
+│  ├─ .firebaserc
 │  ├─ firebase.json
 │  ├─ tailwind.config.js
 │  ├─ vite.config.js
@@ -91,7 +92,7 @@ Create a `.env` file in the `frontend/` directory with the following variable:
 VITE_API_URL=http://localhost:8080/api
 ```
 
-**Note**: The frontend Firebase configuration is already set up in `src/firebaseConfig.js` with the project's Firebase credentials.
+**Note**: The frontend Firebase configuration is already set up with the project's Firebase credentials in `src/firebaseConfig.js` and `.firebaserc`.
 
 ## Local Development Setup
 
@@ -159,7 +160,15 @@ Frontend app runs at [http://localhost:5173](http://localhost:5173)
 
 ### Frontend Firebase Setup
 
-The frontend Firebase configuration is already configured in `src/firebaseConfig.js` with the project's Firebase credentials. If you need to use a different Firebase project, update the configuration in this file.
+The frontend Firebase configuration is already configured with the project's Firebase credentials:
+
+- **`src/firebaseConfig.js`**: Contains the Firebase app configuration (API keys, project ID, etc.)
+- **`.firebaserc`**: Specifies the default Firebase project ID (`e-hotel-internship`)
+
+If you need to use a different Firebase project, update both files:
+
+1. Update the configuration in `src/firebaseConfig.js`
+2. Update the project ID in `.firebaserc`
 
 ## Containerization (Backend Only)
 
