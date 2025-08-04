@@ -10,7 +10,7 @@ E-Hotel is a private prototype reservation platform for a fictional hotel chain.
 - **Back-End**: Node.js + ExpressJS REST API
 - **Authentication & Data**: Firebase Authentication & Firestore
 - **Containerization**: Docker (backend only)
-- **CI/CD**: GitHub Actions (build, test, and deploy on merge to `main`)
+- **CI/CD**: GitHub Actions (build, (no testing yet), and deploy on merge to `main`)
 - **Cloud Infrastructure**: Google Cloud Run, Firestore
 
 ## Business Analysis & UML Models
