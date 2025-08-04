@@ -203,17 +203,31 @@ The project includes GitHub Actions workflows for automated deployment:
 
 ### Required GitHub Secrets
 
-For the CI/CD workflows to work, you need to set up these secrets in your GitHub repository:
+For the CI/CD workflows to work, you need to set up secrets in two separate GitHub environments:
 
-- `GCP_BACKEND_DEPLOYMENT_SA_KEY`: Google Cloud service account key
-- `GCP_PROJECT_ID`: Your Google Cloud project ID
+#### Server Environment Secrets
+
+These secrets are used for the backend deployment workflow:
+
+- `BACKEND_PORT`: Backend service port (e.g., "8080")
+- `FIREBASE_SDK_SA_KEY`: Firebase service account key content (JSON content)
 - `FIRESTORE_DATABASE_ID`: Your Firestore database ID
-- `FIREBASE_SDK_SA_KEY`: Firebase service account key content
-- `WORKLOAD_IDENTITY_PROVIDER`: Workload identity provider
+- `GCP_BACKEND_DEPLOYMENT_SA_KEY`: Google Cloud service account key
 - `GCP_BACKEND_DEPLOYMENT_SA_NAME`: Service account name
-- `GCP_LOCATION`: Google Cloud region
+- `GCP_LOCATION`: Google Cloud region (e.g., "us-central1")
+- `GCP_PROJECT_ID`: Your Google Cloud project ID
 - `REGISTRY_ARTIFACTS_REPOSITORY_NAME`: Container registry repository name
-- `BACKEND_PORT`: Backend service port
+- `WORKLOAD_IDENTITY_PROVIDER`: Workload identity provider
+
+#### Frontend Environment Secrets
+
+These secrets are used for the frontend deployment workflow:
+
+- `FIREBASERC`: Firebase project configuration (JSON content)
+- `FIREBASE_CONFIG`: Firebase configuration for frontend (JSON content)
+- `FIREBASE_FRONTEND_DEPLOYMENT_SA_KEY`: Firebase service account key for frontend deployment
+- `GCP_LOCATION`: Google Cloud region (e.g., "us-central1")
+- `VITE_API_URL`: Production API URL for the frontend
 
 ## Available Scripts
 
