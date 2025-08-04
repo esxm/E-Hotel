@@ -14,9 +14,12 @@ export default function MyBookings() {
   });
   const [err, setErr] = useState("");
   const { showLoading, hideLoading } = useLoading();
-  const { user, role } = useAuth();
+  const { user, role, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    // Wait for authentication to be established before making API calls
+    if (authLoading) return;
+
     const fetchBookings = async () => {
       try {
         showLoading();
@@ -97,7 +100,7 @@ export default function MyBookings() {
     };
 
     fetchBookings();
-  }, [role]);
+  }, [role, authLoading]); // Add authLoading as dependency
 
   const pageTitle =
     role === "Receptionist" || role === "HotelManager"

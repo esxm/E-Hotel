@@ -10,7 +10,7 @@ import SuccessToast from "../components/SuccessToast";
 
 export default function HotelRooms() {
   const { hotelId } = useParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const { showLoading, hideLoading } = useLoading();
   const navigate = useNavigate();
   const [rooms, setRooms] = useState([]);
@@ -32,7 +32,7 @@ export default function HotelRooms() {
 
   // Fetch user account data
   useEffect(() => {
-    if (!user) return;
+    if (!user || authLoading) return;
 
     const fetchUserAccount = async () => {
       try {
@@ -47,19 +47,21 @@ export default function HotelRooms() {
     };
 
     fetchUserAccount();
-  }, [user]);
+  }, [user, authLoading]);
 
   // Check authentication on component mount
   useEffect(() => {
+    if (authLoading) return; // Wait for authentication to be established
+
     if (!user) {
       setErr("Please log in to view hotel rooms");
       return;
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   // Fetch hotel details (which now includes services)
   useEffect(() => {
-    if (!user) return; // Don't fetch if not authenticated
+    if (!user || authLoading) return; // Don't fetch if not authenticated or still loading
 
     const fetchHotelDetails = async () => {
       try {
@@ -86,7 +88,7 @@ export default function HotelRooms() {
       }
     };
     fetchHotelDetails();
-  }, [hotelId, user, navigate]);
+  }, [hotelId, user, authLoading, navigate]);
 
   // Function to update input dates and ensure check-out is after check-in
   const updateInputDates = (newCi, newCo) => {

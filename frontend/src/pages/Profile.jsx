@@ -12,13 +12,16 @@ import ErrorToast from "../components/ErrorToast";
 import SuccessToast from "../components/SuccessToast";
 
 export default function Profile() {
-  const { role } = useAuth();
+  const { role, loading: authLoading } = useAuth();
   const { showLoading, hideLoading } = useLoading();
   const [userData, setUserData] = useState({});
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
   useEffect(() => {
+    // Wait for authentication to be established before making API calls
+    if (authLoading) return;
+
     const fetchUserData = async () => {
       try {
         showLoading();
@@ -32,7 +35,7 @@ export default function Profile() {
     };
 
     fetchUserData();
-  }, [role]);
+  }, [role, authLoading]);
 
   // Add effect to clear success message after 3 seconds
   useEffect(() => {

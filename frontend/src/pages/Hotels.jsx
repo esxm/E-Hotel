@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Link } from "react-router-dom";
 import { useLoading } from "../contexts/LoadingContext";
+import { useAuth } from "../contexts/AuthContext";
 import hotelIcon from "../assets/hotel.png";
 import roomIcon from "../assets/room.png";
 import phoneIcon from "../assets/phone-call.png";
@@ -13,10 +14,14 @@ export default function Hotels() {
   const [hotels, setHotels] = useState([]);
   const [err, setErr] = useState("");
   const { showLoading, hideLoading } = useLoading();
+  const { user, loading: authLoading } = useAuth();
   const [successMsg, setSuccessMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
+    // Wait for authentication to be established before making API calls
+    if (authLoading) return;
+
     showLoading();
     api
       .get("/hotels")
@@ -29,8 +34,10 @@ export default function Hotels() {
       .finally(() => {
         hideLoading();
       });
-  }, []);
+  }, [authLoading]); // Add authLoading as dependency
 
+  if (authLoading)
+    return <p className="text-center">Loading authentication...</p>;
   if (err) return <p className="text-red-500 text-center">{err}</p>;
 
   const HotelCard = ({ hotel }) => (
