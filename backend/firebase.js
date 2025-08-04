@@ -7,6 +7,10 @@ const fs = require("fs");
 
 const dbId = process.env.FIRESTORE_DATABASE_ID; // e.g. "e-hotel" or "e-hotel-sdm-db"
 
+if (!dbId) {
+  throw new Error("MISSING FIRESTORE DATABASE ID");
+}
+
 // Initialize Firebase Admin
 try {
   let credential;
