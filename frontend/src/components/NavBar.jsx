@@ -77,7 +77,7 @@ export default function NavBar() {
                     My bookings
                   </Link>
                 )}
-                {["Receptionist", "SystemAdmin"].includes(role) && (
+                {role === "Receptionist" && (
                   <>
                     <Link
                       to="/reception"
@@ -90,20 +90,9 @@ export default function NavBar() {
                       />
                       Bookings
                     </Link>
-                    <Link
-                      to="/reception/cancellations"
-                      className="flex items-center gap-2 text-white dark:text-white hover:text-blue-200 dark:hover:text-primary transition-colors duration-200"
-                    >
-                      <img
-                        src={requestIcon}
-                        alt="Requests"
-                        className="h-5 w-5 invert brightness-0 dark:invert dark:brightness-0 dark:opacity-80"
-                      />
-                      Requests
-                    </Link>
                   </>
                 )}
-                {["HotelManager", "SystemAdmin"].includes(role) && (
+                {role === "HotelManager" && (
                   <>
                     <Link
                       to="/hotels"
@@ -126,6 +115,21 @@ export default function NavBar() {
                         className="h-5 w-5 invert brightness-0 dark:invert dark:brightness-0 dark:opacity-80"
                       />
                       Stats
+                    </Link>
+                  </>
+                )}
+                {role === "SystemAdmin" && (
+                  <>
+                    <Link
+                      to="/admin"
+                      className="flex items-center gap-2 text-white dark:text-white hover:text-blue-200 dark:hover:text-primary transition-colors duration-200"
+                    >
+                      <img
+                        src={statsIcon}
+                        alt="Admin"
+                        className="h-5 w-5 invert brightness-0 dark:invert dark:brightness-0 dark:opacity-80"
+                      />
+                      Admin
                     </Link>
                   </>
                 )}

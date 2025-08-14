@@ -5,6 +5,8 @@ const CancellationRecord = require("../models/cancellationRecord");
 const PaymentTransaction = require("../models/paymentTransaction");
 const Invoice = require("../models/invoice");
 const roomService = require("./roomService");
+const serviceResourceService = require("./serviceResourceService");
+const Service = require("../models/service"); // Added for service booking
 
 const bookingsCol = db.collection("bookings");
 const cancelsCol = db.collection("cancellations");
@@ -802,5 +804,267 @@ exports.payPenalty = async ({ hotelId, bookingID, customerID }) => {
     return { bookingID, penaltyPaid: true };
   } catch (e) {
     return { error: e.message };
+  }
+};
+
+// Service Booking with Resource Management
+exports.createServiceBooking = async ({
+  hotelId,
+  customerID,
+  serviceID,
+  bookingDate,
+  requiredResources = {},
+  notes = "",
+}) => {
+  try {
+    console.log("Starting service booking creation process...");
+    
+    // Validate required fields
+    if (!hotelId) throw new Error("Hotel ID is required");
+    if (!customerID) throw new Error("Customer ID is required");
+    if (!serviceID) throw new Error("Service ID is required");
+    if (!bookingDate) throw new Error("Booking date is required");
+
+    // Check if service exists and get its details
+    const serviceDoc = await db.collection("services").doc(serviceID).get();
+    if (!serviceDoc.exists) throw new Error("Service not found");
+    
+    const serviceData = serviceDoc.data();
+    const service = new Service({ serviceID: serviceDoc.id, ...serviceData });
+
+    // Check service capacity and reserve resources
+    console.log("Checking service capacity...");
+    const capacityCheck = await serviceResourceService.checkServiceCapacity(
+      hotelId,
+      serviceID,
+      requiredResources
+    );
+
+    if (!capacityCheck.hasCapacity) {
+      throw new Error(`Service unavailable: ${capacityCheck.message}`);
+    }
+
+    // Check customer balance
+    console.log("Checking customer balance...");
+    const customerDoc = await db.collection("customers").doc(customerID).get();
+    if (!customerDoc.exists) throw new Error("Customer not found");
+    
+    const customerData = customerDoc.data();
+    const hasSufficientBalance = customerData.balance >= service.cost;
+
+    if (!hasSufficientBalance) {
+      throw new Error(`Insufficient balance. Required: $${service.cost}, Available: $${customerData.balance}`);
+    }
+
+    console.log("Starting transaction...");
+    let serviceBookingId;
+    
+    // Start a transaction to ensure atomicity
+    await db.runTransaction(async (transaction) => {
+      // Reserve the service resources
+      const reservationSuccess = await serviceResourceService.reserveServiceResources(
+        hotelId,
+        serviceID,
+        requiredResources
+      );
+
+      if (!reservationSuccess) {
+        throw new Error("Failed to reserve service resources");
+      }
+
+      // Deduct service cost from customer balance
+      transaction.update(db.collection("customers").doc(customerID), {
+        balance: admin.firestore.FieldValue.increment(-service.cost),
+      });
+
+      // Create service booking
+      const serviceBookingPayload = {
+        hotelID: hotelId,
+        customerID,
+        serviceID,
+        bookingDate: admin.firestore.Timestamp.fromDate(new Date(bookingDate)),
+        requiredResources,
+        notes,
+        cost: service.cost,
+        status: "confirmed",
+        createdAt: admin.firestore.Timestamp.now(),
+        paymentStatus: "paid",
+      };
+
+      const serviceBookingRef = db.collection("serviceBookings").doc();
+      serviceBookingId = serviceBookingRef.id;
+      transaction.set(serviceBookingRef, serviceBookingPayload);
+
+      // Create payment transaction
+      const paymentPayload = {
+        bookingID: serviceBookingId,
+        amount: service.cost,
+        paymentMethod: "balance",
+        transactionDate: admin.firestore.Timestamp.now(),
+        status: "completed",
+        type: "service",
+        serviceID,
+      };
+      const paymentRef = db.collection("paymentTransactions").doc();
+      transaction.set(paymentRef, paymentPayload);
+    });
+
+    console.log(`✅ New service booking created with ID: ${serviceBookingId}`);
+
+    return {
+      serviceBookingID: serviceBookingId,
+      hotelID: hotelId,
+      customerID,
+      serviceID,
+      serviceName: service.name,
+      bookingDate: new Date(bookingDate),
+      cost: service.cost,
+      status: "confirmed",
+      paymentStatus: "paid",
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+exports.cancelServiceBooking = async ({
+  hotelId,
+  serviceBookingID,
+  customerID,
+  reason = "",
+}) => {
+  try {
+    console.log("Starting service booking cancellation...");
+    
+    // Validate required fields
+    if (!hotelId) throw new Error("Hotel ID is required");
+    if (!serviceBookingID) throw new Error("Service booking ID is required");
+    if (!customerID) throw new Error("Customer ID is required");
+
+    // Get service booking
+    const serviceBookingDoc = await db.collection("serviceBookings").doc(serviceBookingID).get();
+    if (!serviceBookingDoc.exists) throw new Error("Service booking not found");
+    
+    const serviceBookingData = serviceBookingDoc.data();
+    if (serviceBookingData.hotelID !== hotelId) throw new Error("Wrong hotel");
+    if (serviceBookingData.customerID !== customerID) throw new Error("Wrong customer");
+    if (serviceBookingData.status === "cancelled") throw new Error("Service booking already cancelled");
+
+    // Check if booking is within cancellation period (e.g., 24 hours before)
+    const bookingDate = serviceBookingData.bookingDate.toDate();
+    const now = new Date();
+    const hoursUntilBooking = (bookingDate - now) / (1000 * 60 * 60);
+    
+    let refundAmount = 0;
+    if (hoursUntilBooking > 24) {
+      // Full refund if cancelled more than 24 hours before
+      refundAmount = serviceBookingData.cost;
+    } else if (hoursUntilBooking > 2) {
+      // 50% refund if cancelled 2-24 hours before
+      refundAmount = serviceBookingData.cost * 0.5;
+    }
+    // No refund if cancelled less than 2 hours before
+
+    console.log("Starting cancellation transaction...");
+    
+    // Start a transaction to ensure atomicity
+    await db.runTransaction(async (transaction) => {
+      // Update service booking status
+      transaction.update(db.collection("serviceBookings").doc(serviceBookingID), {
+        status: "cancelled",
+        cancelledAt: admin.firestore.Timestamp.now(),
+        cancellationReason: reason,
+        refundAmount,
+      });
+
+      // Release service resources
+      await serviceResourceService.releaseServiceResources(
+        hotelId,
+        serviceBookingData.serviceID,
+        serviceBookingData.requiredResources || {}
+      );
+
+      // Refund customer if applicable
+      if (refundAmount > 0) {
+        transaction.update(db.collection("customers").doc(customerID), {
+          balance: admin.firestore.FieldValue.increment(refundAmount),
+        });
+
+        // Create refund transaction
+        const refundPayload = {
+          bookingID: serviceBookingID,
+          amount: refundAmount,
+          paymentMethod: "balance",
+          transactionDate: admin.firestore.Timestamp.now(),
+          status: "completed",
+          type: "refund",
+          serviceID: serviceBookingData.serviceID,
+        };
+        const refundRef = db.collection("paymentTransactions").doc();
+        transaction.set(refundRef, refundPayload);
+      }
+    });
+
+    console.log(`✅ Service booking cancelled: ${serviceBookingID}`);
+
+    return {
+      serviceBookingID,
+      status: "cancelled",
+      refundAmount,
+      message: refundAmount > 0 
+        ? `Service booking cancelled. Refunded: $${refundAmount}` 
+        : "Service booking cancelled. No refund applicable.",
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+exports.getServiceBookings = async (hotelId, customerID = null) => {
+  try {
+    let query = db.collection("serviceBookings").where("hotelID", "==", hotelId);
+    
+    if (customerID) {
+      query = query.where("customerID", "==", customerID);
+    }
+
+    const snapshot = await query.orderBy("createdAt", "desc").get();
+    
+    const serviceBookings = await Promise.all(
+      snapshot.docs.map(async (doc) => {
+        const data = doc.data();
+        
+        // Get service details
+        const serviceDoc = await db.collection("services").doc(data.serviceID).get();
+        const serviceName = serviceDoc.exists ? serviceDoc.data().name : "Unknown Service";
+        
+        // Get customer details
+        const customerDoc = await db.collection("customers").doc(data.customerID).get();
+        const customerName = customerDoc.exists ? customerDoc.data().name : "Unknown Customer";
+
+        return {
+          serviceBookingID: doc.id,
+          hotelID: data.hotelID,
+          customerID: data.customerID,
+          customerName,
+          serviceID: data.serviceID,
+          serviceName,
+          bookingDate: data.bookingDate.toDate(),
+          requiredResources: data.requiredResources || {},
+          notes: data.notes || "",
+          cost: data.cost,
+          status: data.status,
+          paymentStatus: data.paymentStatus,
+          createdAt: data.createdAt.toDate(),
+          cancelledAt: data.cancelledAt ? data.cancelledAt.toDate() : null,
+          cancellationReason: data.cancellationReason || "",
+          refundAmount: data.refundAmount || 0,
+        };
+      })
+    );
+
+    return serviceBookings;
+  } catch (error) {
+    throw new Error(`Error fetching service bookings: ${error.message}`);
   }
 };

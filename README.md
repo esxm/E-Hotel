@@ -1,263 +1,247 @@
-# E-Hotel Platform
+# E-Hotel Management System
 
-## Overview
+A comprehensive hotel management system with advanced service resource management capabilities.
 
-E-Hotel is a private prototype reservation platform for a fictional hotel chain. It showcases a complete software development lifecycle, from business analysis and UML modeling to a working implementation using modern web technologies, containerization, and cloud deployment.
+## Features
 
-## Architecture & Tech Stack
+### Core Hotel Management
+- Hotel registration and management
+- Room booking and availability tracking
+- Customer management and profiles
+- Payment processing and invoicing
+- Staff management (Managers, Receptionists)
 
-- **Front-End**: React 19 + Vite, styled with Tailwind CSS
-- **Back-End**: Node.js + ExpressJS REST API
-- **Authentication & Data**: Firebase Authentication & Firestore
-- **Containerization**: Docker (backend only)
-- **CI/CD**: GitHub Actions (build, (no testing yet), and deploy on merge to `main`)
-- **Cloud Infrastructure**: Google Cloud Run, Firestore
+### Advanced Service Resource Management 🆕
+- **Real-time capacity tracking** for hotel services
+- **Resource allocation and monitoring** (staff, equipment, space)
+- **Service booking with capacity validation**
+- **Automated resource reservation and release**
+- **Capacity analytics and alerts**
+- **Service availability management**
 
-## Business Analysis & UML Models
+## Service Resource Management System
 
-All analysis deliverables were created in StarUML and exported as images into the [documentation file](SDM-Project.pdf):
+The E-Hotel system now includes a sophisticated resource management system that allows hotels to:
 
-- **Use Case Diagrams** & Descriptions
-- **Activity & Sequence Diagrams** for booking, check-in, check-out, cancellation
-- **Domain Class Diagram** capturing entities (Room, Booking, PaymentTransaction, Invoice, etc.) and relationships
+### 1. Track Service Resources
+- **Staff Resources**: Kitchen staff, lifeguards, spa therapists, etc.
+- **Equipment Resources**: Gym equipment, laundry machines, network bandwidth
+- **Space Resources**: Dining areas, treatment rooms, parking spaces
+- **Material Resources**: Supplies and consumables
 
-## Repository Structure
+### 2. Monitor Service Capacity
+- Real-time tracking of current vs. maximum capacity
+- Utilization rate calculations
+- Capacity alerts when thresholds are exceeded
+- Service availability status management
 
+### 3. Manage Service Bookings
+- Capacity checking before booking confirmation
+- Automatic resource reservation upon booking
+- Resource release upon booking cancellation
+- Refund processing with cancellation policies
+
+### 4. Analytics and Reporting
+- Service utilization analytics
+- Resource allocation reports
+- Capacity trend analysis
+- Low capacity alerts
+
+## API Endpoints
+
+### Service Resource Management
 ```
-/      (root)
-├─ backend/         # Express API service
-│  ├─ controllers/
-│  ├─ middleware/
-│  ├─ models/
-│  ├─ routes/
-│  ├─ services/
-│  ├─ credentials/  # service account JSONs (firebase-sdk-sa-key.json)
-│  ├─ .env          # environment variables
-│  ├─ Dockerfile
-│  ├─ server.js
-│  └─ package.json
-├─ frontend/        # React + Vite application
-│  ├─ public/
-│  ├─ src/
-│  │  ├─ components/
-│  │  ├─ contexts/
-│  │  ├─ hooks/
-│  │  ├─ lib/
-│  │  ├─ pages/
-│  │  ├─ firebase.js
-│  │  └─ firebaseConfig.js
-│  ├─ .env
-│  ├─ .firebaserc
-│  ├─ firebase.json
-│  ├─ tailwind.config.js
-│  ├─ vite.config.js
-│  └─ package.json
-└─ .github/workflows/  # CI/CD workflows
-```
-
-## Prerequisites
-
-- **Node.js** v18.18.0+
-- **npm** or **yarn** package manager
-- **Docker** (for backend container builds)
-- **Firebase CLI** (optional, for local development)
-- **Google Cloud SDK** (for deployments)
-
-## Environment Configuration
-
-### Backend Environment Variables
-
-Create a `.env` file in the `backend/` directory with the following variables:
-
-```env
-# Firebase Configuration
-FIREBASE_SDK_SA_KEY=./credentials/firebase-sdk-sa-key.json
-FIRESTORE_DATABASE_ID=YOUR_FIRESTORE_DB_ID
-
-# Server Configuration
-PORT=8080
+POST   /service-resources/resources                    # Create service resource
+GET    /service-resources/services/:serviceID/resources # Get service resources
+PUT    /service-resources/resources/:resourceID        # Update service resource
+DELETE /service-resources/resources/:resourceID        # Delete service resource
 ```
 
-**Important**: You need to:
-
-1. Create a Firebase service account key file and place it in `backend/credentials/firebase-sdk-sa-key.json`
-2. Replace `YOUR_FIRESTORE_DB_ID` with your actual Firestore database ID
-
-### Frontend Environment Variables
-
-Create a `.env` file in the `frontend/` directory with the following variable:
-
-```env
-# API Configuration
-VITE_API_URL=http://localhost:8080/api
+### Hotel Service Capacity
+```
+POST   /service-resources/hotels/:hotelID/capacities   # Create hotel service capacity
+GET    /service-resources/hotels/:hotelID/capacities   # Get all hotel capacities
+GET    /service-resources/hotels/:hotelID/services/:serviceID/capacity # Get specific capacity
+PUT    /service-resources/capacities/:capacityID       # Update capacity
 ```
 
-**Note**: The frontend Firebase configuration is already set up with the project's Firebase credentials in `src/firebaseConfig.js` and `.firebaserc`.
+### Capacity Checking
+```
+POST   /service-resources/hotels/:hotelID/services/:serviceID/check-capacity # Check availability
+POST   /service-resources/hotels/:hotelID/services/:serviceID/reserve        # Reserve resources
+POST   /service-resources/hotels/:hotelID/services/:serviceID/release        # Release resources
+```
 
-## Local Development Setup
+### Analytics
+```
+GET    /service-resources/hotels/:hotelID/analytics    # Get service analytics
+GET    /service-resources/hotels/:hotelID/alerts       # Get capacity alerts
+```
 
-### 1. Clone and Install Dependencies
+### Service Bookings
+```
+POST   /service-bookings/hotels/:hotelId/service-bookings     # Create service booking
+GET    /service-bookings/hotels/:hotelId/service-bookings     # Get service bookings
+GET    /service-bookings/hotels/:hotelId/service-bookings/:id # Get specific booking
+POST   /service-bookings/hotels/:hotelId/service-bookings/:id/cancel # Cancel booking
+```
 
+## Data Models
+
+### ServiceResource
+```javascript
+{
+  resourceID: string,
+  serviceID: string,
+  resourceName: string,
+  resourceType: "staff" | "equipment" | "space" | "material",
+  requiredQuantity: number,
+  unit: string,
+  description: string,
+  isPerBooking: boolean,
+  maxConcurrentUsage: number
+}
+```
+
+### HotelServiceCapacity
+```javascript
+{
+  capacityID: string,
+  hotelID: string,
+  serviceID: string,
+  resources: { [resourceID]: number },
+  maxConcurrentBookings: number,
+  currentBookings: number,
+  isAvailable: boolean,
+  availabilityNotes: string,
+  lastUpdated: Date
+}
+```
+
+### Service (Enhanced)
+```javascript
+{
+  serviceID: string,
+  name: string,
+  cost: number,
+  isOneTime: boolean,
+  description: string,
+  resourceRequirements: { [resourceID]: number },
+  estimatedDuration: number,
+  category: string,
+  requiresBooking: boolean
+}
+```
+
+## Frontend Components
+
+### ServiceCapacityDashboard
+- Real-time capacity monitoring
+- Resource allocation management
+- Capacity alerts and notifications
+- Utilization analytics visualization
+
+### ServiceBooking
+- Service selection with capacity checking
+- Real-time availability validation
+- Booking confirmation with resource reservation
+- Special requests and notes
+
+## Setup and Installation
+
+### Prerequisites
+- Node.js (v16 or higher)
+- Firebase project with Firestore
+- React development environment
+
+### Backend Setup
 ```bash
-# Clone the repository
-git clone <repository-url>
-cd E-Hotel
-
-# Install backend dependencies
 cd backend
 npm install
-
-# Install frontend dependencies
-cd ../frontend
-npm install
-```
-
-### 2. Backend Setup
-
-```bash
-cd backend
-
-# Create credentials directory and add your Firebase service account key
-mkdir -p credentials
-# Copy your firebase-sdk-sa-key.json to credentials/
-
-# Create .env file (copy from env.example)
 cp env.example .env
-# Edit .env with your actual values
-
-# Start the development server
+# Configure Firebase credentials in .env
+npm run seed  # Initialize with sample data including service resources
 npm start
 ```
 
-Backend API runs at [http://localhost:8080](http://localhost:8080)
-
-### 3. Frontend Setup
-
+### Frontend Setup
 ```bash
 cd frontend
-
-# Create .env file (copy from env.example)
+npm install
 cp env.example .env
-# Edit .env with your API URL
-
-# Start the development server
+# Configure API endpoints in .env
 npm run dev
 ```
 
-Frontend app runs at [http://localhost:5173](http://localhost:5173)
+## Sample Data
 
-## Firebase Setup Requirements
+The system includes comprehensive sample data for:
 
-### Backend Firebase Setup
+### Services
+- WiFi, Breakfast, Pool Access, Spa, Parking
+- Room Service, Gym Access, Laundry
 
-1. Create a Firebase project in the Firebase Console
-2. Generate a service account key:
-   - Go to Project Settings > Service Accounts
-   - Click "Generate new private key"
-   - Save the JSON file as `backend/credentials/firebase-sdk-sa-key.json`
-3. Create a Firestore database and note the database ID
-4. Update the `FIRESTORE_DATABASE_ID` in your backend `.env` file
+### Service Resources
+- Staff resources (kitchen staff, lifeguards, therapists)
+- Equipment resources (gym equipment, laundry machines)
+- Space resources (dining areas, treatment rooms, parking)
 
-### Frontend Firebase Setup
+### Hotel Capacities
+- Dynamic capacity allocation based on hotel size
+- Resource availability tracking
+- Utilization monitoring
 
-The frontend Firebase configuration is already configured with the project's Firebase credentials:
+## Usage Examples
 
-- **`src/firebaseConfig.js`**: Contains the Firebase app configuration (API keys, project ID, etc.)
-- **`.firebaserc`**: Specifies the default Firebase project ID (`e-hotel-internship`)
-
-If you need to use a different Firebase project, update both files:
-
-1. Update the configuration in `src/firebaseConfig.js`
-2. Update the project ID in `.firebaserc`
-
-## Containerization (Backend Only)
-
-### Build Backend Image
-
-```bash
-docker build -t e-hotel-backend ./backend
+### 1. Check Service Capacity
+```javascript
+const capacityCheck = await api.post(
+  `/service-resources/hotels/${hotelId}/services/${serviceId}/check-capacity`
+);
 ```
 
-### Run Backend Container
-
-```bash
-docker run -d -p 8080:8080 \
-  -e FIREBASE_SDK_SA_KEY=/app/credentials/firebase-sdk-sa-key.json \
-  -e FIRESTORE_DATABASE_ID=your-db-id \
-  -v $(pwd)/backend/credentials:/app/credentials \
-  e-hotel-backend
+### 2. Book Service with Resource Management
+```javascript
+const booking = await api.post(`/service-bookings/hotels/${hotelId}/service-bookings`, {
+  customerID: user.uid,
+  serviceID: serviceId,
+  bookingDate: "2024-01-15T10:00:00",
+  notes: "Special dietary requirements"
+});
 ```
 
-## CI/CD & Deployment
+### 3. Get Service Analytics
+```javascript
+const analytics = await api.get(`/service-resources/hotels/${hotelId}/analytics`);
+```
 
-The project includes GitHub Actions workflows for automated deployment:
+## Security and Access Control
 
-- **Backend Deployment** (`.github/workflows/backend-deploy.yml`):
+- Role-based access control for resource management
+- Hotel managers can manage their hotel's service capacities
+- Receptionists can view capacity information and manage bookings
+- Customers can book services with real-time availability checking
 
-  - Builds Docker image from backend
-  - Deploys to Google Cloud Run
-  - Automatically sets environment variables including `FIRESTORE_DATABASE_ID`
+## Monitoring and Alerts
 
-- **Frontend Deployment** (`.github/workflows/frontend-deployment-merge.yml`):
-  - Builds and deploys the React frontend
+The system provides:
+- Real-time capacity monitoring
+- Utilization rate tracking
+- Automated alerts for low capacity
+- Resource allocation optimization suggestions
 
-### Required GitHub Secrets
+## Contributing
 
-For the CI/CD workflows to work, you need to set up secrets in two separate GitHub environments:
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Add tests for new functionality
+5. Submit a pull request
 
-#### Server Environment Secrets
+## License
 
-These secrets are used for the backend deployment workflow:
+This project is licensed under the MIT License.
 
-- `BACKEND_PORT`: Backend service port (e.g., "8080")
-- `FIREBASE_SDK_SA_KEY`: Firebase service account key content (JSON content)
-- `FIRESTORE_DATABASE_ID`: Your Firestore database ID
-- `GCP_BACKEND_DEPLOYMENT_SA_KEY`: Google Cloud service account key
-- `GCP_BACKEND_DEPLOYMENT_SA_NAME`: Service account name
-- `GCP_LOCATION`: Google Cloud region (e.g., "us-central1")
-- `GCP_PROJECT_ID`: Your Google Cloud project ID
-- `REGISTRY_ARTIFACTS_REPOSITORY_NAME`: Container registry repository name
-- `WORKLOAD_IDENTITY_PROVIDER`: Workload identity provider
+## Support
 
-#### Frontend Environment Secrets
-
-These secrets are used for the frontend deployment workflow:
-
-- `FIREBASERC`: Firebase project configuration (JSON content)
-- `FIREBASE_CONFIG`: Firebase configuration for frontend (JSON content)
-- `FIREBASE_FRONTEND_DEPLOYMENT_SA_KEY`: Firebase service account key for frontend deployment
-- `GCP_LOCATION`: Google Cloud region (e.g., "us-central1")
-- `VITE_API_URL`: Production API URL for the frontend
-
-## Available Scripts
-
-### Backend Scripts
-
-- `npm start`: Start the production server
-- `npm test`: Run tests (currently not implemented)
-
-### Frontend Scripts
-
-- `npm run dev`: Start development server
-- `npm run build`: Build for production
-- `npm run lint`: Run ESLint
-- `npm run preview`: Preview production build
-
-## UML Diagrams & Documentation
-
-All UML models are in the `SDM-Project.pdf` file, including (StarUML/PlantUML) as exported PNG/SVG formats for easy reference.
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Firebase Authentication Errors**: Ensure your Firebase service account key is correctly placed and has the necessary permissions
-2. **Firestore Connection Issues**: Verify your `FIRESTORE_DATABASE_ID` is correct and the database exists
-3. **CORS Errors**: The backend is configured to allow CORS from the frontend development server
-4. **Port Conflicts**: Ensure ports 8080 (backend) and 5173 (frontend) are available
-
-### Development Tips
-
-- Use the browser's developer tools to check for API errors
-- Check the backend console logs for server-side errors
-- Ensure all environment variables are properly set before starting the servers
+For support and questions, please open an issue in the repository.

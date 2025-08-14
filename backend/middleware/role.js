@@ -20,7 +20,7 @@ module.exports =
     }
 
     // For hotel-scoped routes, check hotel access
-    const { hotelId } = req.params;
+    const hotelId = req.params.hotelId || req.params.hotelID;
     if (hotelId) {
       // SystemAdmin has access to all hotels
       if (role === "SystemAdmin") {

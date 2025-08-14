@@ -59,10 +59,49 @@ export default function Login() {
           </div>
         </div>
         <div className="bg-gray-100 dark:bg-gray-800 p-4 rounded-lg text-sm text-gray-700 dark:text-gray-300">
-          <p className="font-semibold mb-2">Test Accounts:</p>
-          <p>Hotel Manager: sarah.johnson@hotel.com / 123456</p>
-          <p>Receptionist: jennifer.smith@hotel.com / 123456</p>
-          <p>Customer: james.brown@example.com / 123456</p>
+          <p className="font-semibold mb-3">Quick-fill Accounts (click to auto-fill):</p>
+          <div className="grid gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEmail("admin@hotel.com");
+                setPw("123456");
+              }}
+              className="w-full text-left px-3 py-2 rounded bg-white/60 dark:bg-gray-900 hover:bg-white/80 dark:hover:bg-gray-700 transition"
+            >
+              <span className="font-medium">System Admin</span>: admin@hotel.com / 123456
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail("sarah.johnson@hotel.com");
+                setPw("123456");
+              }}
+              className="w-full text-left px-3 py-2 rounded bg-white/60 dark:bg-gray-900 hover:bg-white/80 dark:hover:bg-gray-700 transition"
+            >
+              <span className="font-medium">Hotel Manager</span>: sarah.johnson@hotel.com / 123456
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail("jennifer.smith@hotel.com");
+                setPw("123456");
+              }}
+              className="w-full text-left px-3 py-2 rounded bg-white/60 dark:bg-gray-900 hover:bg-white/80 dark:hover:bg-gray-700 transition"
+            >
+              <span className="font-medium">Receptionist</span>: jennifer.smith@hotel.com / 123456
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEmail("james.brown@example.com");
+                setPw("123456");
+              }}
+              className="w-full text-left px-3 py-2 rounded bg-white/60 dark:bg-gray-900 hover:bg-white/80 dark:hover:bg-gray-700 transition"
+            >
+              <span className="font-medium">Customer</span>: james.brown@example.com / 123456
+            </button>
+          </div>
         </div>
         <form onSubmit={submit} className="mt-8 space-y-6">
           <div className="rounded-md shadow-sm -space-y-px">

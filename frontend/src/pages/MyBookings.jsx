@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { useLoading } from "../contexts/LoadingContext";
 import { useAuth } from "../contexts/AuthContext";
+import { useServiceResources } from "../hooks/useServiceResources";
 import scheduledIcon from "../assets/scheduled.png";
 import BookingCard from "../components/BookingCard";
+import ServiceBookingCard from "../components/ServiceBookingCard";
 import ErrorToast from "../components/ErrorToast";
 
 export default function MyBookings() {
@@ -12,9 +14,15 @@ export default function MyBookings() {
     active: [],
     future: [],
   });
+  const [serviceBookings, setServiceBookings] = useState({
+    history: [],
+    active: [],
+    future: [],
+  });
   const [err, setErr] = useState("");
   const { showLoading, hideLoading } = useLoading();
   const { user, role, loading: authLoading } = useAuth();
+  const { getServiceBookings, cancelServiceBooking } = useServiceResources();
 
   useEffect(() => {
     // Wait for authentication to be established before making API calls
@@ -90,17 +98,89 @@ export default function MyBookings() {
             { history: [], active: [], future: [] }
           );
 
-          setBookings(combinedBookings);
-        }
-      } catch (e) {
-        setErr(e.response?.data?.error || e.message);
-      } finally {
-        hideLoading();
+                  setBookings(combinedBookings);
       }
-    };
+
+      // Fetch service bookings for customers
+      if (role === "Customer") {
+        const hotelsResponse = await api.get("/hotels");
+        const hotels = hotelsResponse.data;
+
+        const allServiceBookings = await Promise.all(
+          hotels.map(async (hotel) => {
+            try {
+              const response = await getServiceBookings(hotel.hotelID, user.uid);
+              return response || [];
+            } catch (error) {
+              console.error(`Error fetching service bookings for hotel ${hotel.hotelID}:`, error);
+              return [];
+            }
+          })
+        );
+
+        // Combine and categorize service bookings
+        const combinedServiceBookings = allServiceBookings.flat();
+        const now = new Date();
+
+        const serviceHistory = combinedServiceBookings.filter(booking => 
+          booking.status === "cancelled" || new Date(booking.bookingDate) < now
+        );
+        const serviceActive = combinedServiceBookings.filter(booking => 
+          booking.status === "confirmed" && new Date(booking.bookingDate) >= now
+        );
+        const serviceFuture = combinedServiceBookings.filter(booking => 
+          booking.status === "confirmed" && new Date(booking.bookingDate) > now
+        );
+
+        setServiceBookings({ history: serviceHistory, active: serviceActive, future: serviceFuture });
+      }
+    } catch (e) {
+      setErr(e.response?.data?.error || e.message);
+    } finally {
+      hideLoading();
+    }
+  };
 
     fetchBookings();
-  }, [role, authLoading]); // Add authLoading as dependency
+}, [role, authLoading, getServiceBookings]); // Add authLoading as dependency
+
+const handleServiceBookingCancel = async (hotelId, serviceBookingId) => {
+  try {
+    await cancelServiceBooking(hotelId, serviceBookingId, { customerID: user.uid });
+    // Refresh service bookings
+    const hotelsResponse = await api.get("/hotels");
+    const hotels = hotelsResponse.data;
+
+    const allServiceBookings = await Promise.all(
+      hotels.map(async (hotel) => {
+        try {
+          const response = await getServiceBookings(hotel.hotelID, user.uid);
+          return response || [];
+        } catch (error) {
+          console.error(`Error fetching service bookings for hotel ${hotel.hotelID}:`, error);
+          return [];
+        }
+      })
+    );
+
+    const combinedServiceBookings = allServiceBookings.flat();
+    const now = new Date();
+
+    const serviceHistory = combinedServiceBookings.filter(booking => 
+      booking.status === "cancelled" || new Date(booking.bookingDate) < now
+    );
+    const serviceActive = combinedServiceBookings.filter(booking => 
+      booking.status === "confirmed" && new Date(booking.bookingDate) >= now
+    );
+    const serviceFuture = combinedServiceBookings.filter(booking => 
+      booking.status === "confirmed" && new Date(booking.bookingDate) > now
+    );
+
+    setServiceBookings({ history: serviceHistory, active: serviceActive, future: serviceFuture });
+  } catch (error) {
+    setErr(error.response?.data?.error || 'Failed to cancel service booking');
+  }
+};
 
   const pageTitle =
     role === "Receptionist" || role === "HotelManager"
@@ -182,6 +262,68 @@ export default function MyBookings() {
               )}
             </div>
           </div>
+
+          {/* Service Bookings Section - Only for Customers */}
+          {role === "Customer" && (
+            <>
+              <div className="border-t pt-8">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+                  Service Bookings
+                </h2>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                  Active Service Bookings
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {serviceBookings.active.length > 0 ? (
+                    serviceBookings.active.map((booking) => (
+                      <ServiceBookingCard key={booking.serviceBookingID} booking={booking} onCancel={handleServiceBookingCancel} />
+                    ))
+                  ) : (
+                    <p className="text-gray-600 dark:text-gray-300">
+                      No active service bookings
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                  Upcoming Service Bookings
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {serviceBookings.future.length > 0 ? (
+                    serviceBookings.future.map((booking) => (
+                      <ServiceBookingCard key={booking.serviceBookingID} booking={booking} onCancel={handleServiceBookingCancel} />
+                    ))
+                  ) : (
+                    <p className="text-gray-600 dark:text-gray-300">
+                      No upcoming service bookings
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">
+                  Past Service Bookings
+                </h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {serviceBookings.history.length > 0 ? (
+                    serviceBookings.history.map((booking) => (
+                      <ServiceBookingCard key={booking.serviceBookingID} booking={booking} onCancel={handleServiceBookingCancel} />
+                    ))
+                  ) : (
+                    <p className="text-gray-600 dark:text-gray-300">
+                      No past service bookings
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>

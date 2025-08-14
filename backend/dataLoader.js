@@ -23,6 +23,9 @@ const COLLECTIONS = [
   "invoices",
   "services",
   "serviceRequests",
+  "serviceResources",
+  "hotelServiceCapacity",
+  "serviceBookings",
   "stats",
 ];
 
@@ -115,6 +118,14 @@ async function seed() {
     }
     nextPageToken = page.pageToken;
   } while (nextPageToken);
+
+  // Create a SystemAdmin test user
+  console.log("✨ SystemAdmin user");
+  const sysAdmin = await admin
+    .auth()
+    .createUser({ email: "admin@hotel.com", password: "123456" });
+  await ensureRole(sysAdmin.uid, "SystemAdmin");
+  console.log("Created SystemAdmin: admin@hotel.com / 123456");
 
   /* 1. Create 20 users with realistic names */
   let users = [];
@@ -241,6 +252,154 @@ async function seed() {
     serviceIDs.push(serviceID);
   }
 
+  /* 2.1. Create service resources */
+  console.log("✨ Service Resources");
+  const serviceResources = [
+    // WiFi resources
+    {
+      serviceID: serviceIDs[0], // WiFi
+      resourceName: "Network Bandwidth",
+      resourceType: "equipment",
+      requiredQuantity: 1,
+      unit: "connections",
+      description: "Internet bandwidth per connection",
+      isPerBooking: true,
+    },
+    // Breakfast resources
+    {
+      serviceID: serviceIDs[1], // Breakfast
+      resourceName: "Kitchen Staff",
+      resourceType: "staff",
+      requiredQuantity: 2,
+      unit: "people",
+      description: "Kitchen staff required for breakfast service",
+      isPerBooking: false,
+      maxConcurrentUsage: 10,
+    },
+    {
+      serviceID: serviceIDs[1], // Breakfast
+      resourceName: "Dining Space",
+      resourceType: "space",
+      requiredQuantity: 1,
+      unit: "seats",
+      description: "Dining area seating capacity",
+      isPerBooking: true,
+    },
+    // Pool resources
+    {
+      serviceID: serviceIDs[2], // Pool
+      resourceName: "Lifeguard",
+      resourceType: "staff",
+      requiredQuantity: 1,
+      unit: "people",
+      description: "Lifeguard required for pool safety",
+      isPerBooking: false,
+      maxConcurrentUsage: 20,
+    },
+    {
+      serviceID: serviceIDs[2], // Pool
+      resourceName: "Pool Space",
+      resourceType: "space",
+      requiredQuantity: 1,
+      unit: "swimmers",
+      description: "Pool capacity for swimmers",
+      isPerBooking: true,
+    },
+    // Spa resources
+    {
+      serviceID: serviceIDs[3], // Spa
+      resourceName: "Spa Therapist",
+      resourceType: "staff",
+      requiredQuantity: 1,
+      unit: "people",
+      description: "Spa therapist for treatments",
+      isPerBooking: true,
+    },
+    {
+      serviceID: serviceIDs[3], // Spa
+      resourceName: "Treatment Room",
+      resourceType: "space",
+      requiredQuantity: 1,
+      unit: "rooms",
+      description: "Spa treatment room",
+      isPerBooking: true,
+    },
+    // Parking resources
+    {
+      serviceID: serviceIDs[4], // Parking
+      resourceName: "Parking Space",
+      resourceType: "space",
+      requiredQuantity: 1,
+      unit: "spaces",
+      description: "Parking space for vehicle",
+      isPerBooking: true,
+    },
+    // Room Service resources
+    {
+      serviceID: serviceIDs[5], // Room Service
+      resourceName: "Kitchen Staff",
+      resourceType: "staff",
+      requiredQuantity: 2,
+      unit: "people",
+      description: "Kitchen staff for room service",
+      isPerBooking: false,
+      maxConcurrentUsage: 15,
+    },
+    {
+      serviceID: serviceIDs[5], // Room Service
+      resourceName: "Delivery Staff",
+      resourceType: "staff",
+      requiredQuantity: 1,
+      unit: "people",
+      description: "Staff to deliver room service",
+      isPerBooking: true,
+    },
+    // Gym resources
+    {
+      serviceID: serviceIDs[6], // Gym
+      resourceName: "Gym Equipment",
+      resourceType: "equipment",
+      requiredQuantity: 1,
+      unit: "stations",
+      description: "Gym equipment station",
+      isPerBooking: true,
+    },
+    {
+      serviceID: serviceIDs[6], // Gym
+      resourceName: "Fitness Trainer",
+      resourceType: "staff",
+      requiredQuantity: 1,
+      unit: "people",
+      description: "Fitness trainer available",
+      isPerBooking: false,
+      maxConcurrentUsage: 8,
+    },
+    // Laundry resources
+    {
+      serviceID: serviceIDs[7], // Laundry
+      resourceName: "Laundry Equipment",
+      resourceType: "equipment",
+      requiredQuantity: 1,
+      unit: "machines",
+      description: "Laundry machine capacity",
+      isPerBooking: true,
+    },
+    {
+      serviceID: serviceIDs[7], // Laundry
+      resourceName: "Laundry Staff",
+      resourceType: "staff",
+      requiredQuantity: 1,
+      unit: "people",
+      description: "Staff for laundry service",
+      isPerBooking: false,
+      maxConcurrentUsage: 12,
+    },
+  ];
+
+  for (const resource of serviceResources) {
+    await add("serviceResources", resource);
+  }
+
   /* 3. hotels + rooms */
   console.log("✨ Hotels & rooms");
   const hotelIDs = [],
@@ -284,6 +443,56 @@ async function seed() {
         pricePerNight: r % 2 ? 100 : 150,
       });
       roomIDs[hotelID].push(rid);
+    }
+  }
+
+  /* 3.1. Create hotel service capacities */
+  console.log("✨ Hotel Service Capacities");
+  for (let h = 0; h < hotelIDs.length; h++) {
+    const hotelID = hotelIDs[h];
+    const hotelDoc = await db.collection("hotels").doc(hotelID).get();
+    const hotelData = hotelDoc.data();
+    
+    for (const serviceID of hotelData.availableServiceIDs) {
+      // Get service details to determine capacity
+      const serviceDoc = await db.collection("services").doc(serviceID).get();
+      const serviceData = serviceDoc.data();
+      
+      // Get resources for this service
+      const resourceSnapshot = await db.collection("serviceResources")
+        .where("serviceID", "==", serviceID)
+        .get();
+      
+      const resources = {};
+      let maxConcurrentBookings = 10; // Default
+      
+      resourceSnapshot.docs.forEach(doc => {
+        const resourceData = doc.data();
+        const resourceKey = doc.id;
+        
+        if (resourceData.isPerBooking) {
+          // For per-booking resources, set capacity based on hotel size
+          const capacity = Math.floor(rand() * 20) + 10; // 10-30 capacity
+          resources[resourceKey] = capacity;
+          maxConcurrentBookings = Math.min(maxConcurrentBookings, capacity);
+        } else {
+          // For shared resources, set based on max concurrent usage
+          const capacity = resourceData.maxConcurrentUsage || 10;
+          resources[resourceKey] = capacity;
+          maxConcurrentBookings = Math.min(maxConcurrentBookings, capacity);
+        }
+      });
+      
+      // Create capacity record
+      await add("hotelServiceCapacity", {
+        hotelID,
+        serviceID,
+        resources,
+        maxConcurrentBookings,
+        currentBookings: 0,
+        isAvailable: true,
+        availabilityNotes: "",
+      });
     }
   }
 

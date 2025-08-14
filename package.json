@@ -1,0 +1,21 @@
+{
+  "name": "e-hotel",
+  "version": "1.0.0",
+  "description": "E-Hotel Management System with Service Resource Management",
+  "main": "index.js",
+  "scripts": {
+    "dev:client": "npm run dev --prefix frontend",
+    "dev:server": "npm run dev --prefix backend",
+    "backend": "node backend/server.js",
+    "dev:all": "concurrently -k \"npm:dev:server\" \"npm:dev:client\"",
+    "dev": "npm run dev:all",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": ["hotel", "management", "booking", "services"],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
+

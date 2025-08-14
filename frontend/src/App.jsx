@@ -23,7 +23,10 @@ import BookingDet from "./pages/BookingDetails";
 import Invoice from "./pages/Invoice";
 import Reception from "./pages/Receptionist";
 import Stats from "./pages/Stats";
+import ServiceBooking from "./pages/ServiceBooking";
+import ServiceCapacityDashboard from "./pages/ServiceCapacityDashboard";
 import NotFound from "./pages/NotFound";
+import Admin from "./pages/Admin";
 
 function AppContent() {
   const { isLoading } = useLoading();
@@ -40,6 +43,7 @@ function AppContent() {
           <Route path="/register" element={<Register />} />
           <Route path="/hotels" element={<Hotels />} />
           <Route path="/hotels/:hotelId" element={<HotelRooms />} />
+          <Route path="/hotels/:hotelId/services" element={<ServiceBooking />} />
 
           {/* protected */}
           <Route
@@ -90,6 +94,22 @@ function AppContent() {
             element={
               <Protected roles={["HotelManager", "SystemAdmin"]}>
                 <Stats />
+              </Protected>
+            }
+          />
+          <Route
+            path="/admin"
+            element={
+              <Protected roles={["SystemAdmin"]}>
+                <Admin />
+              </Protected>
+            }
+          />
+          <Route
+            path="/hotels/:hotelId/capacity-dashboard"
+            element={
+              <Protected roles={["HotelManager", "SystemAdmin"]}>
+                <ServiceCapacityDashboard />
               </Protected>
             }
           />
