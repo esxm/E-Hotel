@@ -67,12 +67,14 @@ exports.listRooms = async (hotelId, { checkInDate, checkOutDate } = {}) => {
   return rooms;
 };
 
-exports.createRoom = async ({ hotelId, roomNumber, type }) => {
+exports.createRoom = async ({ hotelId, roomNumber, type, pricePerNight = 0, floor = null }) => {
   const ref = await roomsCol.add({
     hotelID: hotelId,
     roomNumber,
     type,
     status: "available",
+    pricePerNight,
+    ...(floor !== null ? { floor } : {}),
   });
   const d = await ref.get();
   return new Room({
@@ -81,6 +83,24 @@ exports.createRoom = async ({ hotelId, roomNumber, type }) => {
     type: d.data().type,
     status: d.data().status,
     hotelID,
+  });
+};
+
+exports.updateRoom = async (hotelId, roomId, patch) => {
+  // Only allow updates within the same hotel
+  const doc = await roomsCol.doc(roomId).get();
+  if (!doc.exists) throw new Error("room not found");
+  const data = doc.data();
+  if (data.hotelID !== hotelId) throw new Error("wrong hotel");
+  await roomsCol.doc(roomId).update(patch);
+  const updated = await roomsCol.doc(roomId).get();
+  const u = updated.data();
+  return new Room({
+    roomNumber: u.roomNumber,
+    type: u.type,
+    status: u.status,
+    hotelID: u.hotelID,
+    pricePerNight: u.pricePerNight,
   });
 };
 

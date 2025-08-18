@@ -29,6 +29,8 @@ exports.create = async (req, res) => {
       hotelId: req.params.hotelId,
       roomNumber: req.body.roomNumber,
       type: req.body.type,
+      pricePerNight: req.body.pricePerNight,
+      floor: req.body.floor,
     });
     res.status(201).json(room);
   } catch (e) {
@@ -36,6 +38,23 @@ exports.create = async (req, res) => {
       res.status(404).json({ error: e.message });
     } else if (e.message.includes("already exists")) {
       res.status(409).json({ error: e.message });
+    } else {
+      res.status(400).json({ error: e.message });
+    }
+  }
+};
+
+exports.update = async (req, res) => {
+  try {
+    const updated = await roomSvc.updateRoom(
+      req.params.hotelId,
+      req.params.roomId,
+      req.body
+    );
+    res.json(updated);
+  } catch (e) {
+    if (e.message.includes("not found")) {
+      res.status(404).json({ error: e.message });
     } else {
       res.status(400).json({ error: e.message });
     }

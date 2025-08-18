@@ -15,6 +15,12 @@ export default function RoomManagement() {
     priority: 'medium',
     description: ''
   });
+  const [editRoomModal, setEditRoomModal] = useState(false);
+  const [roomForm, setRoomForm] = useState({
+    type: 'standard',
+    pricePerNight: 0,
+    floor: ''
+  });
 
   useEffect(() => {
     loadData();
@@ -65,6 +71,12 @@ export default function RoomManagement() {
   const openMaintenanceModal = (room) => {
     setSelectedRoom(room);
     setMaintenanceModal(true);
+  };
+
+  const openEditRoom = (room) => {
+    setSelectedRoom(room);
+    setRoomForm({ type: room.type || room.roomType || 'standard', pricePerNight: room.pricePerNight || room.price || 0, floor: room.floor || '' });
+    setEditRoomModal(true);
   };
 
   const handleMaintenanceSubmit = async (e) => {
@@ -260,10 +272,10 @@ export default function RoomManagement() {
                   </button>
                 )}
                 <button
-                  onClick={() => {/* View room details */}}
+                  onClick={() => openEditRoom(room)}
                   className="flex-1 bg-gray-600 hover:bg-gray-700 text-white text-xs font-medium py-2 px-3 rounded-md"
                 >
-                  👁️ Details
+                  ✏️ Edit
                 </button>
               </div>
             </div>
@@ -359,6 +371,55 @@ export default function RoomManagement() {
                 >
                   Submit Request
                 </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Room Modal */}
+      {editRoomModal && selectedRoom && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-md mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Edit Room {selectedRoom.roomNumber}</h3>
+              <button onClick={() => setEditRoomModal(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white">✕</button>
+            </div>
+            <form onSubmit={async (e)=>{
+              e.preventDefault();
+              try {
+                showLoading();
+                await api.patch(`/hotels/${selectedRoom.hotelID}/rooms/${selectedRoom.roomID}`, {
+                  type: roomForm.type,
+                  pricePerNight: Number(roomForm.pricePerNight),
+                  floor: roomForm.floor || null,
+                });
+                setEditRoomModal(false);
+                await loadData();
+              } catch (err) {
+                console.error('Error updating room', err);
+              } finally { hideLoading(); }
+            }} className="space-y-4">
+              <div>
+                <label className="block text-sm mb-1">Type</label>
+                <select value={roomForm.type} onChange={e=>setRoomForm(p=>({...p,type:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800">
+                  <option value="standard">Standard</option>
+                  <option value="double">Double</option>
+                  <option value="suite">Suite</option>
+                  <option value="presidential">Presidential Suite</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Price per Night ($)</label>
+                <input type="number" min="0" value={roomForm.pricePerNight} onChange={e=>setRoomForm(p=>({...p,pricePerNight:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800" required />
+              </div>
+              <div>
+                <label className="block text-sm mb-1">Floor</label>
+                <input value={roomForm.floor} onChange={e=>setRoomForm(p=>({...p,floor:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800" />
+              </div>
+              <div className="flex justify-end space-x-2">
+                <button type="button" onClick={()=>setEditRoomModal(false)} className="px-4 py-2 rounded bg-gray-300 dark:bg-gray-700">Cancel</button>
+                <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white">Save</button>
               </div>
             </form>
           </div>

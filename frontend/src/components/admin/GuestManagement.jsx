@@ -10,6 +10,16 @@ export default function GuestManagement() {
   const [selectedHotel, setSelectedHotel] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [activeTab, setActiveTab] = useState('current');
+  const [viewModal, setViewModal] = useState(false);
+  const [selectedBooking, setSelectedBooking] = useState(null);
+  const [createModal, setCreateModal] = useState(false);
+  const [createForm, setCreateForm] = useState({
+    hotelID: '',
+    customerID: '',
+    roomIdInput: '',
+    checkInDate: '',
+    checkOutDate: ''
+  });
 
   useEffect(() => {
     loadData();
@@ -18,13 +28,13 @@ export default function GuestManagement() {
   async function loadData() {
     try {
       showLoading();
-      const [bookingsRes, historyRes, hotelsRes] = await Promise.all([
+      const [bookingsRes, hotelsRes] = await Promise.all([
         api.get('/admin/bookings'),
-        api.get('/admin/guests/history'),
         api.get('/hotels')
       ]);
       setBookings(bookingsRes.data || []);
-      setGuestHistory(historyRes.data || []);
+      // history is a subset where status is checked-in/checked-out
+      setGuestHistory((bookingsRes.data || []).filter(b => ['checked-in','checked-out','cancelled'].includes(b.status)));
       setHotels(hotelsRes.data || []);
     } catch (error) {
       console.error('Error loading guest data:', error);
@@ -86,9 +96,14 @@ export default function GuestManagement() {
   const handleStatusUpdate = async (bookingId, newStatus) => {
     try {
       showLoading();
-      // This would be implemented with a proper API endpoint
-      console.log(`Updating booking ${bookingId} to status: ${newStatus}`);
-      await loadData(); // Refresh data
+      if (newStatus === 'checked-in') {
+        await api.post(`/bookings/${bookingId}/checkin`);
+      } else if (newStatus === 'checked-out') {
+        await api.post(`/bookings/${bookingId}/checkout`);
+      } else if (newStatus === 'cancelled') {
+        await api.post(`/bookings/${bookingId}/cancel`);
+      }
+      await loadData();
     } catch (error) {
       console.error('Error updating booking status:', error);
     } finally {
@@ -102,9 +117,9 @@ export default function GuestManagement() {
         Guest Management
       </h2>
 
-      {/* Filters */}
+      {/* Filters & Create */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Filter by Hotel
@@ -155,6 +170,15 @@ export default function GuestManagement() {
                 Total: {filteredBookings.length}
               </span>
             </div>
+          </div>
+
+          <div className="flex items-end">
+            <button
+              onClick={() => setCreateModal(true)}
+              className="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-md"
+            >
+              + Create Booking
+            </button>
           </div>
         </div>
       </div>
@@ -289,9 +313,7 @@ export default function GuestManagement() {
                             Check Out
                           </button>
                         )}
-                        <button className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300">
-                          View
-                        </button>
+                        <button onClick={() => { setSelectedBooking(booking); setViewModal(true); }} className="text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-300">View</button>
                       </div>
                     </td>
                   </tr>
@@ -379,6 +401,45 @@ export default function GuestManagement() {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* View Booking Modal */}
+      {viewModal && selectedBooking && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-xl mx-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Booking Details</h3>
+              <button onClick={()=>setViewModal(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white">✕</button>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div><span className="text-gray-600 dark:text-gray-300">Hotel:</span> <span className="font-medium">{getHotelName(selectedBooking.hotelID)}</span></div>
+              <div><span className="text-gray-600 dark:text-gray-300">Check-in:</span> <span className="font-medium">{formatDate(selectedBooking.checkInDate)}</span></div>
+              <div><span className="text-gray-600 dark:text-gray-300">Check-out:</span> <span className="font-medium">{formatDate(selectedBooking.checkOutDate)}</span></div>
+              <div><span className="text-gray-600 dark:text-gray-300">Amount:</span> <span className="font-medium">${selectedBooking.totalAmount || 0}</span></div>
+              <div><span className="text-gray-600 dark:text-gray-300">Status:</span> <span className="font-medium">{selectedBooking.status}</span></div>
+            </div>
+            <div className="mt-6 text-right"><button onClick={()=>setViewModal(false)} className="px-4 py-2 rounded bg-blue-600 text-white">Close</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Booking Modal */}
+      {createModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 w-full max-w-lg mx-4">
+            <div className="flex items-center justify-between mb-4"><h3 className="text-lg font-semibold text-gray-900 dark:text-white">Create Booking</h3><button onClick={()=>setCreateModal(false)} className="text-gray-500 hover:text-gray-700 dark:text-gray-300 dark:hover:text-white">✕</button></div>
+            <form onSubmit={async (e)=>{ e.preventDefault(); try { showLoading(); const payload = { hotelId: createForm.hotelID, customerID: createForm.customerID, roomDetails: [createForm.roomIdInput], checkInDate: createForm.checkInDate, checkOutDate: createForm.checkOutDate }; await api.post('/bookings', payload); setCreateModal(false); await loadData(); } catch (err) { console.error('Create booking failed', err); } finally { hideLoading(); } }} className="space-y-4">
+              <div><label className="block text-sm mb-1">Hotel</label><select value={createForm.hotelID} onChange={e=>setCreateForm(p=>({...p,hotelID:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800" required><option value="">Select hotel</option>{hotels.map(h=> <option key={h.hotelID} value={h.hotelID}>{h.name}</option>)}</select></div>
+              <div><label className="block text-sm mb-1">Customer ID</label><input value={createForm.customerID} onChange={e=>setCreateForm(p=>({...p,customerID:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800" placeholder="Customer UID" required /></div>
+              <div><label className="block text-sm mb-1">Room ID</label><input value={createForm.roomIdInput} onChange={e=>setCreateForm(p=>({...p,roomIdInput:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800" placeholder="Room document ID" required /></div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div><label className="block text-sm mb-1">Check-in</label><input type="date" value={createForm.checkInDate} onChange={e=>setCreateForm(p=>({...p,checkInDate:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800" required /></div>
+                <div><label className="block text-sm mb-1">Check-out</label><input type="date" value={createForm.checkOutDate} onChange={e=>setCreateForm(p=>({...p,checkOutDate:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800" required /></div>
+              </div>
+              <div className="flex justify-end space-x-2"><button type="button" onClick={()=>setCreateModal(false)} className="px-4 py-2 rounded bg-gray-300 dark:bg-gray-700">Cancel</button><button type="submit" className="px-4 py-2 rounded bg-green-600 text-white">Create</button></div>
+            </form>
           </div>
         </div>
       )}

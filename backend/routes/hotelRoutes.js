@@ -70,6 +70,40 @@ router.post("/", role("SystemAdmin"), async (req, res) => {
   }
 });
 
+// Update a hotel (HotelManager of that hotel or SystemAdmin)
+router.patch(
+  "/:hotelId",
+  role("HotelManager", "SystemAdmin"),
+  async (req, res) => {
+    try {
+      await hotelCtrl.update(req, res);
+    } catch (error) {
+      if (error.status) {
+        res.status(error.status).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  }
+);
+
+// Delete a hotel (SystemAdmin only)
+router.delete(
+  "/:hotelId",
+  role("SystemAdmin"),
+  async (req, res) => {
+    try {
+      await hotelCtrl.remove(req, res);
+    } catch (error) {
+      if (error.status) {
+        res.status(error.status).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  }
+);
+
 // Hotel-scoped routes
 router.use("/:hotelId/rooms", roomRoutes);
 router.use("/:hotelId/bookings", bookingRoutes);

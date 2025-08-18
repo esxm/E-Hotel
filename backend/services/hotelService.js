@@ -26,6 +26,21 @@ exports.listHotels = async ({
     const snap = await query.get();
     const hotels = snap.docs.map((d) => {
       const data = d.data();
+      // For admin we include more fields
+      if (includeAll) {
+        return new Hotel({
+          hotelID: d.id,
+          name: data.name || "Unnamed Hotel",
+          starRating: data.starRating || 0,
+          address: data.address || "No address",
+          totalRooms: data.totalRooms || 0,
+          description: data.description || "",
+          phone: data.phone || "",
+          email: data.email || "",
+          managerId: data.managerId || null,
+          receptionistIds: data.receptionistIds || [],
+        });
+      }
       return new Hotel({
         hotelID: d.id,
         name: data.name || "Unnamed Hotel",
@@ -65,6 +80,29 @@ exports.createHotel = async ({
   });
   const d = await ref.get();
   return new Hotel({ hotelID: d.id, ...d.data() });
+};
+
+/** Update an existing hotel document */
+exports.updateHotel = async (hotelId, patch) => {
+  await hotelsCol.doc(hotelId).update(patch);
+  const d = await hotelsCol.doc(hotelId).get();
+  const data = d.data();
+  return new Hotel({
+    hotelID: d.id,
+    name: data.name,
+    address: data.address,
+    starRating: data.starRating,
+    totalRooms: data.totalRooms,
+    description: data.description || "",
+    phone: data.phone || "",
+    email: data.email || "",
+  });
+};
+
+/** Delete a hotel */
+exports.deleteHotel = async (hotelId) => {
+  await hotelsCol.doc(hotelId).delete();
+  return true;
 };
 
 exports.getHotels = async () => {

@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import hotelIcon from "../assets/hotel.png";
 import myBookingsIcon from "../assets/myBookings.png";
@@ -7,6 +7,11 @@ import statsIcon from "../assets/stats.png";
 
 export default function Home() {
   const { user, role } = useAuth();
+
+  // Redirect SystemAdmin users directly to admin dashboard
+  if (user && role === "SystemAdmin") {
+    return <Navigate to="/admin" replace />;
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
@@ -101,7 +106,7 @@ export default function Home() {
                   </Link>
                 </div>
               )}
-              {["Receptionist", "SystemAdmin"].includes(role) && (
+              {role === "Receptionist" && (
                 <>
                   <div className="space-y-2">
                     <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -127,7 +132,7 @@ export default function Home() {
                   </div>
                 </>
               )}
-              {["HotelManager", "SystemAdmin"].includes(role) && (
+              {role === "HotelManager" && (
                 <>
                   <div className="space-y-2">
                     <p className="text-sm text-gray-600 dark:text-gray-400">

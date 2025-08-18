@@ -1,7 +1,8 @@
 const express = require("express");
 const auth = require("../middleware/auth");
 const role = require("../middleware/role");
-const { db } = require("../firebase");
+const { db, admin } = require("../firebase");
+const bookingSvc = require("../services/bookingService");
 
 const router = express.Router();
 
@@ -38,6 +39,235 @@ router.get("/receptionists", async (req, res) => {
   } catch (error) {
     console.error("Error fetching receptionists:", error);
     res.status(500).json({ error: "Failed to fetch receptionists" });
+  }
+});
+
+// Create a new customer
+router.post("/customers", async (req, res) => {
+  try {
+    const { email, password = "123456", name, phoneNumber = "", idType = "id_card", idNumber = "", balance = 0 } = req.body;
+    const user = await admin.auth().createUser({ email, password, displayName: name });
+    await admin.auth().setCustomUserClaims(user.uid, { role: "Customer" });
+    await db.collection("customers").doc(user.uid).set({
+      name,
+      phoneNumber,
+      idType,
+      idNumber,
+      balance: Number(balance) || 0,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.status(201).json({ customerID: user.uid, name, email, phoneNumber, idType, idNumber, balance: Number(balance) || 0 });
+  } catch (error) {
+    console.error("Error creating customer:", error);
+    res.status(500).json({ error: "Failed to create customer" });
+  }
+});
+
+// Update a customer profile
+router.patch("/customers/:customerId", async (req, res) => {
+  try {
+    const { name, phoneNumber, idType, idNumber, balance } = req.body;
+    const update = {};
+    if (name !== undefined) update.name = name;
+    if (phoneNumber !== undefined) update.phoneNumber = phoneNumber;
+    if (idType !== undefined) update.idType = idType;
+    if (idNumber !== undefined) update.idNumber = idNumber;
+    if (balance !== undefined) update.balance = Number(balance) || 0;
+    update.updatedAt = admin.firestore.FieldValue.serverTimestamp();
+    await db.collection("customers").doc(req.params.customerId).update(update);
+    const snap = await db.collection("customers").doc(req.params.customerId).get();
+    res.json({ customerID: snap.id, ...snap.data() });
+  } catch (error) {
+    console.error("Error updating customer:", error);
+    res.status(500).json({ error: "Failed to update customer" });
+  }
+});
+
+// Delete a customer
+router.delete("/customers/:customerId", async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    await admin.auth().deleteUser(customerId).catch(() => {});
+    await db.collection("customers").doc(customerId).delete().catch(() => {});
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting customer:", error);
+    res.status(500).json({ error: "Failed to delete customer" });
+  }
+});
+// Create a new hotel manager (creates Auth user + Firestore doc)
+router.post("/managers", async (req, res) => {
+  try {
+    const { email, password = "123456", name, phoneNumber } = req.body;
+    const user = await admin.auth().createUser({ email, password, displayName: name });
+    await admin.auth().setCustomUserClaims(user.uid, { role: "HotelManager" });
+    await db.collection("hotelManagers").doc(user.uid).set({
+      name,
+      email,
+      phoneNumber: phoneNumber || "",
+      hotelIDs: [],
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    res.status(201).json({ managerID: user.uid, name, email, phoneNumber: phoneNumber || "", hotelIDs: [] });
+  } catch (error) {
+    console.error("Error creating manager:", error);
+    res.status(500).json({ error: "Failed to create manager" });
+  }
+});
+
+// Update a hotel manager profile
+router.patch("/managers/:managerId", async (req, res) => {
+  try {
+    const { name, phoneNumber } = req.body;
+    const ref = db.collection("hotelManagers").doc(req.params.managerId);
+    await ref.update({
+      ...(name ? { name } : {}),
+      ...(phoneNumber ? { phoneNumber } : {}),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    const snap = await ref.get();
+    res.json({ managerID: snap.id, ...snap.data() });
+  } catch (error) {
+    console.error("Error updating manager:", error);
+    res.status(500).json({ error: "Failed to update manager" });
+  }
+});
+
+// Delete a manager (removes auth + clears hotel.managerId)
+router.delete("/managers/:managerId", async (req, res) => {
+  try {
+    const { managerId } = req.params;
+    await admin.auth().deleteUser(managerId).catch(() => {});
+    await db.collection("hotelManagers").doc(managerId).delete().catch(() => {});
+    const qs = await db.collection("hotels").where("managerId", "==", managerId).get();
+    const batch = db.batch();
+    qs.forEach((doc) => batch.update(doc.ref, { managerId: null }));
+    await batch.commit();
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting manager:", error);
+    res.status(500).json({ error: "Failed to delete manager" });
+  }
+});
+
+// Create a new receptionist
+router.post("/receptionists", async (req, res) => {
+  try {
+    const { email, password = "123456", name, phoneNumber, hotelId = null } = req.body;
+    const user = await admin.auth().createUser({ email, password, displayName: name });
+    await admin.auth().setCustomUserClaims(user.uid, { role: "Receptionist" });
+    await db.collection("receptionists").doc(user.uid).set({
+      name,
+      email,
+      phoneNumber: phoneNumber || "",
+      hotelID: hotelId,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    if (hotelId) {
+      await db
+        .collection("hotels")
+        .doc(hotelId)
+        .update({ receptionistIds: admin.firestore.FieldValue.arrayUnion(user.uid) });
+    }
+    res.status(201).json({ receptionistID: user.uid, name, email, phoneNumber: phoneNumber || "", hotelID: hotelId });
+  } catch (error) {
+    console.error("Error creating receptionist:", error);
+    res.status(500).json({ error: "Failed to create receptionist" });
+  }
+});
+
+// Update receptionist profile
+router.patch("/receptionists/:receptionistId", async (req, res) => {
+  try {
+    const { name, phoneNumber } = req.body;
+    const ref = db.collection("receptionists").doc(req.params.receptionistId);
+    await ref.update({
+      ...(name ? { name } : {}),
+      ...(phoneNumber ? { phoneNumber } : {}),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+    const snap = await ref.get();
+    res.json({ receptionistID: snap.id, ...snap.data() });
+  } catch (error) {
+    console.error("Error updating receptionist:", error);
+    res.status(500).json({ error: "Failed to update receptionist" });
+  }
+});
+
+// Assign or unassign a receptionist to a single hotel (exclusive)
+router.post("/receptionists/:receptionistId/assign", async (req, res) => {
+  try {
+    const { hotelId } = req.body; // null to unassign
+    const { receptionistId } = req.params;
+    // Remove from any current hotels
+    const current = await db
+      .collection("hotels")
+      .where("receptionistIds", "array-contains", receptionistId)
+      .get();
+    const batch = db.batch();
+    current.forEach((doc) => batch.update(doc.ref, { receptionistIds: admin.firestore.FieldValue.arrayRemove(receptionistId) }));
+    await batch.commit();
+
+    if (hotelId) {
+      await db
+        .collection("hotels")
+        .doc(hotelId)
+        .update({ receptionistIds: admin.firestore.FieldValue.arrayUnion(receptionistId) });
+    }
+    await db.collection("receptionists").doc(receptionistId).update({ hotelID: hotelId || null });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error assigning receptionist:", error);
+    res.status(500).json({ error: "Failed to assign receptionist" });
+  }
+});
+
+// Delete receptionist
+router.delete("/receptionists/:receptionistId", async (req, res) => {
+  try {
+    const { receptionistId } = req.params;
+    await admin.auth().deleteUser(receptionistId).catch(() => {});
+    await db.collection("receptionists").doc(receptionistId).delete().catch(() => {});
+    const qs = await db
+      .collection("hotels")
+      .where("receptionistIds", "array-contains", receptionistId)
+      .get();
+    const batch = db.batch();
+    qs.forEach((doc) => batch.update(doc.ref, { receptionistIds: admin.firestore.FieldValue.arrayRemove(receptionistId) }));
+    await batch.commit();
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting receptionist:", error);
+    res.status(500).json({ error: "Failed to delete receptionist" });
+  }
+});
+
+// Assign or clear a manager for a hotel
+router.post("/hotels/:hotelId/assign-manager", async (req, res) => {
+  try {
+    const { managerId } = req.body; // can be null to clear
+    await db.collection("hotels").doc(req.params.hotelId).update({ managerId: managerId || null });
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error assigning manager:", error);
+    res.status(500).json({ error: "Failed to assign manager" });
+  }
+});
+
+// Add or remove a receptionist assignment for a hotel
+router.post("/hotels/:hotelId/receptionists", async (req, res) => {
+  try {
+    const { receptionistId, action } = req.body; // action: 'add' | 'remove'
+    const ref = db.collection("hotels").doc(req.params.hotelId);
+    if (action === "remove") {
+      await ref.update({ receptionistIds: admin.firestore.FieldValue.arrayRemove(receptionistId) });
+    } else {
+      await ref.update({ receptionistIds: admin.firestore.FieldValue.arrayUnion(receptionistId) });
+    }
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error updating receptionists:", error);
+    res.status(500).json({ error: "Failed to update receptionist assignments" });
   }
 });
 

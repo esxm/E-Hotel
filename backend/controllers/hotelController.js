@@ -49,3 +49,29 @@ exports.create = async (req, res) => {
     }
   }
 };
+
+exports.update = async (req, res) => {
+  try {
+    const updated = await hotelSvc.updateHotel(req.params.hotelId, req.body);
+    res.json(updated);
+  } catch (error) {
+    if (error.message.includes("not found")) {
+      res.status(404).json({ error: error.message });
+    } else {
+      res.status(400).json({ error: error.message });
+    }
+  }
+};
+
+exports.remove = async (req, res) => {
+  try {
+    await hotelSvc.deleteHotel(req.params.hotelId);
+    res.json({ success: true });
+  } catch (error) {
+    if (error.message.includes("not found")) {
+      res.status(404).json({ error: error.message });
+    } else {
+      res.status(400).json({ error: error.message });
+    }
+  }
+};

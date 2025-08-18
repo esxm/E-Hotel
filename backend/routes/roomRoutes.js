@@ -35,4 +35,21 @@ router.post("/", role("HotelManager", "SystemAdmin"), async (req, res) => {
   }
 });
 
+// Update room pricing/type/status
+router.patch(
+  "/:roomId",
+  role("HotelManager", "SystemAdmin"),
+  async (req, res) => {
+    try {
+      await roomCtrl.update(req, res);
+    } catch (error) {
+      if (error.status) {
+        res.status(error.status).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  }
+);
+
 module.exports = router;
