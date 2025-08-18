@@ -1,5 +1,5 @@
 // middleware/auth.js
-const { admin } = require("../firebase");
+const { admin, db } = require("../firebase");
 
 module.exports = async (req, res, next) => {
   const header = req.headers.authorization;
@@ -11,11 +11,31 @@ module.exports = async (req, res, next) => {
   const idToken = header.split("Bearer ")[1];
   try {
     const decoded = await admin.auth().verifyIdToken(idToken);
+    const role = decoded.role || "Customer";
+    let assignedHotelIds = decoded.assignedHotelIds || [];
+    let managedHotelIds = decoded.managedHotelIds || [];
+
+    // Hydrate from Firestore if claims are missing
+    if (role === "HotelManager" && managedHotelIds.length === 0) {
+      const snap = await db.collection("hotelManagers").doc(decoded.uid).get();
+      if (snap.exists) {
+        const d = snap.data();
+        managedHotelIds = Array.isArray(d.hotelIDs) ? d.hotelIDs : [];
+      }
+    }
+    if (role === "Receptionist" && assignedHotelIds.length === 0) {
+      const snap = await db.collection("receptionists").doc(decoded.uid).get();
+      if (snap.exists && snap.data().hotelID) {
+        assignedHotelIds = [snap.data().hotelID];
+      }
+    }
+
     req.user = {
       uid: decoded.uid,
-      role: decoded.role || "Customer",
-      assignedHotelIds: decoded.assignedHotelIds || [],
-      managedHotelIds: decoded.managedHotelIds || [],
+      id: decoded.uid, // backward-compat field used in some controllers
+      role,
+      assignedHotelIds,
+      managedHotelIds,
     };
     next();
   } catch (error) {

@@ -23,6 +23,7 @@ import BookingDet from "./pages/BookingDetails";
 import Invoice from "./pages/Invoice";
 import Reception from "./pages/Receptionist";
 import Stats from "./pages/Stats";
+import Manager from "./pages/Manager";
 import ServiceBooking from "./pages/ServiceBooking";
 import ServiceCapacityDashboard from "./pages/ServiceCapacityDashboard";
 import NotFound from "./pages/NotFound";
@@ -94,6 +95,14 @@ function AppContent() {
             element={
               <Protected roles={["HotelManager", "SystemAdmin"]}>
                 <Stats />
+              </Protected>
+            }
+          />
+          <Route
+            path="/manager"
+            element={
+              <Protected roles={["HotelManager", "SystemAdmin"]}>
+                <Manager />
               </Protected>
             }
           />

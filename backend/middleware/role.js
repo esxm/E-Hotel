@@ -1,7 +1,9 @@
 // middleware/role.js
+const { db } = require("../firebase");
+
 module.exports =
   (...allowedRoles) =>
-  (req, res, next) => {
+  async (req, res, next) => {
     // If no roles specified, allow public access
     if (allowedRoles.length === 0) {
       return next();
@@ -12,7 +14,7 @@ module.exports =
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const { role, assignedHotelIds, managedHotelIds } = req.user;
+    const { role, assignedHotelIds, managedHotelIds, uid } = req.user;
 
     // Check if user's role is allowed
     if (!allowedRoles.includes(role)) {
@@ -28,8 +30,17 @@ module.exports =
       }
 
       // HotelManager checks managed hotels
-      if (role === "HotelManager" && managedHotelIds.includes(hotelId)) {
-        return next();
+      if (role === "HotelManager") {
+        if (managedHotelIds.includes(hotelId)) {
+          return next();
+        }
+        // Fallback: allow if hotel document points to this manager
+        try {
+          const hotelDoc = await db.collection("hotels").doc(hotelId).get();
+          if (hotelDoc.exists && hotelDoc.data().managerId === uid) {
+            return next();
+          }
+        } catch (e) {}
       }
 
       // Receptionist and Customer can view all hotels

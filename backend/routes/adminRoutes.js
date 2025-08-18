@@ -261,8 +261,16 @@ router.post("/hotels/:hotelId/receptionists", async (req, res) => {
     const ref = db.collection("hotels").doc(req.params.hotelId);
     if (action === "remove") {
       await ref.update({ receptionistIds: admin.firestore.FieldValue.arrayRemove(receptionistId) });
+      // Also clear receptionist's hotelID if it matches this hotel
+      const recRef = db.collection("receptionists").doc(receptionistId);
+      const recSnap = await recRef.get();
+      if (recSnap.exists && recSnap.data().hotelID === req.params.hotelId) {
+        await recRef.update({ hotelID: null });
+      }
     } else {
       await ref.update({ receptionistIds: admin.firestore.FieldValue.arrayUnion(receptionistId) });
+      // Also set receptionist's hotelID to this hotel
+      await db.collection("receptionists").doc(receptionistId).update({ hotelID: req.params.hotelId });
     }
     res.json({ success: true });
   } catch (error) {

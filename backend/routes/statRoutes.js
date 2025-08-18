@@ -8,7 +8,7 @@ const router = express.Router({ mergeParams: true });
 router.use(auth);
 
 // monthly report
-router.get("/monthly", role("HotelManager"), async (req, res) => {
+router.get("/monthly", role("HotelManager", "SystemAdmin"), async (req, res) => {
   try {
     await statsCtrl.monthly(req, res);
   } catch (error) {

@@ -312,15 +312,15 @@ export default function UserManagement() {
                   <div><label className="block text-sm mb-1">ID Type</label><select value={form.idType} onChange={e=>setForm(p=>({...p,idType:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800"><option value="id_card">ID Card</option><option value="passport">Passport</option><option value="driver_license">Driver License</option></select></div>
                   <div><label className="block text-sm mb-1">ID Number</label><input value={form.idNumber} onChange={e=>setForm(p=>({...p,idNumber:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800" /></div>
                   <div><label className="block text-sm mb-1">Balance</label><input type="number" min="0" value={form.balance} onChange={e=>setForm(p=>({...p,balance:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800" /></div>
-                </div>
-              )}
+        </div>
+      )}
               {form.role === 'Receptionist' && (
                 <div><label className="block text-sm mb-1">Assign to Hotel (optional)</label><input value={form.hotelId} onChange={e=>setForm(p=>({...p,hotelId:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800" placeholder="Hotel ID" /></div>
               )}
               <div className="flex justify-end space-x-2"><button type="button" onClick={()=>setCreateModal(false)} className="px-4 py-2 rounded bg-gray-300 dark:bg-gray-700">Cancel</button><button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white">Create</button></div>
             </form>
-          </div>
-        </div>
+              </div>
+            </div>
       )}
 
       {editModal && selectedUser && (
@@ -339,12 +339,12 @@ export default function UserManagement() {
                   <div><label className="block text-sm mb-1">ID Type</label><select value={form.idType} onChange={e=>setForm(p=>({...p,idType:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800"><option value="id_card">ID Card</option><option value="passport">Passport</option><option value="driver_license">Driver License</option></select></div>
                   <div><label className="block text-sm mb-1">ID Number</label><input value={form.idNumber} onChange={e=>setForm(p=>({...p,idNumber:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800" /></div>
                   <div><label className="block text-sm mb-1">Balance</label><input type="number" min="0" value={form.balance} onChange={e=>setForm(p=>({...p,balance:e.target.value}))} className="w-full border rounded px-3 py-2 bg-white dark:bg-gray-800" /></div>
-                </div>
+            </div>
               )}
               <div className="flex justify-end space-x-2"><button type="button" onClick={()=>setEditModal(false)} className="px-4 py-2 rounded bg-gray-300 dark:bg-gray-700">Cancel</button><button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white">Save</button></div>
             </form>
+            </div>
           </div>
-        </div>
       )}
     </div>
   );

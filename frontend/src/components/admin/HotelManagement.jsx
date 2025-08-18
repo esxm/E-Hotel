@@ -404,7 +404,7 @@ export default function HotelManagement() {
                             <option key={m.managerID} value={m.managerID}>{m.name}</option>
                           ))}
                         </select>
-                      </div>
+                    </div>
                     </div>
                     <div>
                       <div className="flex items-center justify-between">
@@ -435,7 +435,7 @@ export default function HotelManagement() {
                             >
                               ×
                             </button>
-                          </span>
+                      </span>
                         ))}
                         {hotelReceptionists.length === 0 && (
                           <span className="text-gray-500 dark:text-gray-400 text-xs">No receptionists assigned</span>
@@ -738,27 +738,27 @@ export default function HotelManagement() {
               + Add Manager
             </button>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Manager</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Assigned Hotel</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contact</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
-                  {managers.map((manager) => {
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {managers.map((manager) => {
                     const assigned = hotels.find(h => h.managerId === manager.managerID);
-                    return (
-                      <tr key={manager.managerID} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                  return (
+                    <tr key={manager.managerID} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                      <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">{manager.name}</div>
                           <div className="text-sm text-gray-500 dark:text-gray-300">{manager.email}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                           <select
                             value={assigned?.hotelID || ''}
                             onChange={async (e) => {
@@ -771,7 +771,7 @@ export default function HotelManagement() {
                               <option key={h.hotelID} value={h.hotelID}>{h.name}</option>
                             ))}
                           </select>
-                        </td>
+                      </td>
                         <td className="px-6 py-4 whitespace-nowrap">{manager.phoneNumber || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm space-x-3">
                           <button
@@ -808,12 +808,12 @@ export default function HotelManagement() {
                           >
                             Delete
                           </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
             </div>
           </div>
         </div>
@@ -833,27 +833,27 @@ export default function HotelManagement() {
               + Add Receptionist
             </button>
           </div>
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
-                  <tr>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+              <thead className="bg-gray-50 dark:bg-gray-700">
+                <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Receptionist</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Assigned Hotel</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contact</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                </tr>
+              </thead>
+              <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                   {receptionists.map((r) => {
                     const assignedHotel = hotels.find(h => (h.receptionistIds || []).includes(r.receptionistID));
-                    return (
+                  return (
                       <tr key={r.receptionistID} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                        <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-6 py-4 whitespace-nowrap">
                           <div className="text-sm font-medium text-gray-900 dark:text-white">{r.name}</div>
                           <div className="text-sm text-gray-500 dark:text-gray-300">{r.email}</div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                           <select
                             value={assignedHotel?.hotelID || ''}
                             onChange={async (e) => {
@@ -874,7 +874,7 @@ export default function HotelManagement() {
                               <option key={h.hotelID} value={h.hotelID}>{h.name}</option>
                             ))}
                           </select>
-                        </td>
+                      </td>
                         <td className="px-6 py-4 whitespace-nowrap">{r.phoneNumber || '-'}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm space-x-3">
                           <button
@@ -911,12 +911,12 @@ export default function HotelManagement() {
                           >
                             Delete
                           </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
             </div>
           </div>
         </div>

@@ -95,26 +95,15 @@ export default function NavBar() {
                 {role === "HotelManager" && (
                   <>
                     <Link
-                      to="/hotels"
-                      className="flex items-center gap-2 text-white dark:text-white hover:text-blue-200 dark:hover:text-primary transition-colors duration-200"
-                    >
-                      <img
-                        src={hotelIcon}
-                        alt="Hotels"
-                        className="h-5 w-5 invert brightness-0 dark:invert dark:brightness-0 dark:opacity-80"
-                      />
-                      Hotels
-                    </Link>
-                    <Link
-                      to="/stats"
+                      to="/manager"
                       className="flex items-center gap-2 text-white dark:text-white hover:text-blue-200 dark:hover:text-primary transition-colors duration-200"
                     >
                       <img
                         src={statsIcon}
-                        alt="Stats"
+                        alt="Manager"
                         className="h-5 w-5 invert brightness-0 dark:invert dark:brightness-0 dark:opacity-80"
                       />
-                      Stats
+                      Manager
                     </Link>
                   </>
                 )}

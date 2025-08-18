@@ -522,13 +522,34 @@ exports.listBookings = async ({ customerID, hotelId, staffId } = {}) => {
     query = query.where("hotelID", "==", hotelId);
   } else if (staffId) {
     // For staff, get bookings for hotels they manage/work at
-    const staffDoc = await db.collection("staff").doc(staffId).get();
-    if (!staffDoc.exists) {
-      throw new Error("Staff member not found");
-    }
-    const staffData = staffDoc.data();
-    if (staffData.hotelId) {
-      query = query.where("hotelID", "==", staffData.hotelId);
+    // Try receptionist profile
+    const recDoc = await db.collection("receptionists").doc(staffId).get();
+    if (recDoc.exists && recDoc.data().hotelID) {
+      query = query.where("hotelID", "==", recDoc.data().hotelID);
+    } else {
+      // Try manager profile: fetch hotels managed
+      const mgrDoc = await db.collection("hotelManagers").doc(staffId).get();
+      if (mgrDoc.exists && Array.isArray(mgrDoc.data().hotelIDs) && mgrDoc.data().hotelIDs.length > 0) {
+        // When multiple, we cannot do 'in' easily with compound ordering; fallback: filter after fetch
+        const snap = await db.collection("bookings").get();
+        const all = await Promise.all(snap.docs.map(async (d) => {
+          const data = d.data();
+          return new Booking({
+            bookingID: d.id,
+            hotelID: data.hotelID,
+            customerID: data.customerID,
+            roomDetails: data.roomDetails,
+            checkInDate: data.checkInDate.toDate(),
+            checkOutDate: data.checkOutDate.toDate(),
+            checkedOutAt: data.checkedOutAt?.toDate(),
+            cancellationGracePeriod: data.cancellationGracePeriod,
+            totalAmount: data.totalAmount,
+            status: data.status,
+            createdAt: data.createdAt.toDate(),
+          });
+        }));
+        return all.filter((b) => mgrDoc.data().hotelIDs.includes(b.hotelID));
+      }
     }
   }
 
@@ -539,24 +560,11 @@ exports.listBookings = async ({ customerID, hotelId, staffId } = {}) => {
 
       // Get hotel details
       const hotelDoc = await db.collection("hotels").doc(data.hotelID).get();
-      if (!hotelDoc.exists) {
-        console.warn(`Hotel ${data.hotelID} not found for booking ${d.id}`);
-        return null;
-      }
-      const hotelData = hotelDoc.data();
+      const hotelData = hotelDoc.exists ? hotelDoc.data() : {};
 
       // Get customer details
-      const customerDoc = await db
-        .collection("customers")
-        .doc(data.customerID)
-        .get();
-      if (!customerDoc.exists) {
-        console.warn(
-          `Customer ${data.customerID} not found for booking ${d.id}`
-        );
-        return null;
-      }
-      const customerData = customerDoc.data();
+      const customerDoc = await db.collection("customers").doc(data.customerID).get();
+      const customerData = customerDoc.exists ? customerDoc.data() : {};
 
       // Get room details
       const roomPromises = data.roomDetails.map((roomId) =>
@@ -596,18 +604,20 @@ exports.listBookings = async ({ customerID, hotelId, staffId } = {}) => {
         bookingID: d.id,
         hotelID: data.hotelID,
         hotelDetails: {
-          name: hotelData.name,
-          address: hotelData.address,
-          starRating: hotelData.starRating,
+          name: hotelData?.name || "",
+          address: hotelData?.address || "",
+          starRating: hotelData?.starRating || 0,
           phone: hotelData.phone || "",
           email: hotelData.email || "",
         },
         customerID: data.customerID,
-        customerDetails: {
-          name: customerData.name || "",
-          email: customerData.email || "",
-          phoneNumber: customerData.phoneNumber || "",
-        },
+        customerDetails: customerData
+          ? {
+              name: customerData.name || "",
+              email: customerData.email || "",
+              phoneNumber: customerData.phoneNumber || "",
+            }
+          : undefined,
         roomDetails,
         checkInDate: data.checkInDate.toDate(),
         checkOutDate: data.checkOutDate.toDate(),
