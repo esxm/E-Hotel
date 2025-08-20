@@ -7,14 +7,21 @@ const cancelsCol = db.collection("cancellations");
 
 exports.monthlyStats = async (hotelId, year, month) => {
   const snaps = await bookingsCol.where("hotelID", "==", hotelId).get();
-  const all = snaps.docs.map((d) => {
-    const dta = d.data();
-    return {
-      createdAt: dta.createdAt.toDate(),
-      status: dta.status,
-      totalAmount: dta.totalAmount,
-    };
-  });
+  const all = snaps.docs
+    .map((d) => {
+      const dta = d.data();
+      const createdAtTs = dta.createdAt || dta.checkInDate || null;
+      const createdAt = createdAtTs && typeof createdAtTs.toDate === "function"
+        ? createdAtTs.toDate()
+        : null;
+      if (!createdAt) return null;
+      return {
+        createdAt,
+        status: dta.status || "",
+        totalAmount: Number(dta.totalAmount) || 0,
+      };
+    })
+    .filter(Boolean);
 
   const start = new Date(year, month - 1, 1);
   const end = new Date(year, month, 1);
@@ -32,8 +39,11 @@ exports.monthlyStats = async (hotelId, year, month) => {
 
   const cSnap = await cancelsCol.where("hotelID", "==", hotelId).get();
   const cancelCount = cSnap.docs
-    .map((d) => d.data().cancellationTime.toDate())
-    .filter((d) => d >= start && d < end).length;
+    .map((d) => {
+      const t = d.data().cancellationTime;
+      return t && typeof t.toDate === "function" ? t.toDate() : null;
+    })
+    .filter((d) => d && d >= start && d < end).length;
 
   return new StatisticsReport({
     reportID: `${hotelId}-${year}${month.toString().padStart(2, "0")}`,

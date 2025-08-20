@@ -471,15 +471,35 @@ router.get("/hotels/:hotelId/analytics", async (req, res) => {
   }
 });
 
-// Get all bookings with guest details
+// Get all bookings enriched and normalized like staff views
 router.get("/bookings", async (req, res) => {
   try {
-    const snapshot = await db.collection("bookings").orderBy("createdAt", "desc").get();
-    const bookings = snapshot.docs.map(doc => ({
-      bookingID: doc.id,
-      ...doc.data()
-    }));
-    res.json(bookings);
+    // Reuse booking service to enrich data
+    const enriched = await bookingSvc.listBookings();
+    // Flatten some fields for current admin UI compatibility
+    const normalized = enriched
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .map((b) => ({
+        bookingID: b.bookingID,
+        hotelID: b.hotelID,
+        customerID: b.customerID,
+        roomDetails: b.roomDetails,
+        checkInDate: b.checkInDate,
+        checkOutDate: b.checkOutDate,
+        checkedOutAt: b.checkedOutAt,
+        cancellationGracePeriod: b.cancellationGracePeriod,
+        totalAmount: b.totalAmount,
+        status: b.status,
+        paymentStatus: b.paymentStatus,
+        hasInvoice: b.hasInvoice,
+        createdAt: b.createdAt,
+        // Extra fields used by admin UI
+        customerName: b.customerDetails?.name || "",
+        customerEmail: b.customerDetails?.email || "",
+        customerPhone: b.customerDetails?.phoneNumber || "",
+        roomNumber: Array.isArray(b.roomDetails) && b.roomDetails.length ? b.roomDetails[0].roomNumber : undefined,
+      }));
+    res.json(normalized);
   } catch (error) {
     console.error("Error fetching bookings:", error);
     res.status(500).json({ error: "Failed to fetch bookings" });

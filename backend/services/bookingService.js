@@ -122,6 +122,7 @@ exports.createBooking = async ({
     return new Booking({
       bookingID: bookingId,
       hotelID: hotelId,
+      hotelID: hotelId,
       customerID,
       roomDetails,
       checkInDate: new Date(checkInDate),
@@ -191,6 +192,7 @@ exports.listUserBookings = async (hotelId, customerID) => {
 
       return new Booking({
         bookingID: d.id,
+        hotelID: data.hotelID,
         hotelID: data.hotelID,
         hotelDetails: {
           name: hotelData.name,
@@ -277,6 +279,7 @@ exports.listAllUserBookings = async (uid) => {
       return new Booking({
         bookingID: d.id,
         hotelID: data.hotelID,
+        hotelID: data.hotelID,
         hotelDetails: {
           name: hotelData.name,
           address: hotelData.address,
@@ -307,6 +310,7 @@ exports.listHotelBookings = async (hotelId) => {
     const data = d.data();
     return new Booking({
       bookingID: d.id,
+      hotelID,
       hotelID,
       customerID: data.customerID,
       roomDetails: data.roomDetails,
@@ -603,6 +607,7 @@ exports.listBookings = async ({ customerID, hotelId, staffId } = {}) => {
       return new Booking({
         bookingID: d.id,
         hotelID: data.hotelID,
+        hotelID: data.hotelID,
         hotelDetails: {
           name: hotelData?.name || "",
           address: hotelData?.address || "",
@@ -644,18 +649,20 @@ exports.getBookingById = async (bookingId, { customerId, staffId } = {}) => {
 
   // Get hotel details
   const hotelDoc = await db.collection("hotels").doc(data.hotelID).get();
-  const hotelData = hotelDoc.data();
+  const hotelData = hotelDoc.exists ? hotelDoc.data() : {};
 
   // Get room details
   const roomPromises = data.roomDetails.map((roomId) =>
     db.collection("rooms").doc(roomId).get()
   );
   const roomDocs = await Promise.all(roomPromises);
-  const roomDetails = roomDocs.map((roomDoc) => ({
-    roomNumber: roomDoc.data().roomNumber,
-    type: roomDoc.data().type,
-    status: roomDoc.data().status,
-  }));
+  const roomDetails = roomDocs
+    .filter((roomDoc) => roomDoc.exists)
+    .map((roomDoc) => ({
+      roomNumber: roomDoc.data().roomNumber,
+      type: roomDoc.data().type,
+      status: roomDoc.data().status,
+    }));
 
   // Get payment status
   const paymentSnap = await db
@@ -683,13 +690,21 @@ exports.getBookingById = async (bookingId, { customerId, staffId } = {}) => {
   // Check access permissions
   if (customerId && data.customerID !== customerId) return null;
   if (staffId) {
-    const staffDoc = await db.collection("staff").doc(staffId).get();
-    const staffData = staffDoc.data();
-    if (staffData.hotelId && data.hotelID !== staffData.hotelId) return null;
+    // Allow if staff is receptionist assigned to this hotel
+    const recDoc = await db.collection("receptionists").doc(staffId).get();
+    if (recDoc.exists && recDoc.data().hotelID) {
+      if (data.hotelID !== recDoc.data().hotelID) return null;
+    } else {
+      // Or if staff is a manager of this hotel
+      const mgrDoc = await db.collection("hotelManagers").doc(staffId).get();
+      const managedIds = mgrDoc.exists && Array.isArray(mgrDoc.data().hotelIDs) ? mgrDoc.data().hotelIDs : [];
+      if (!managedIds.includes(data.hotelID)) return null;
+    }
   }
 
   return new Booking({
     bookingID: doc.id,
+    hotelID: data.hotelID,
     hotelID: data.hotelID,
     hotelDetails: {
       name: hotelData.name,

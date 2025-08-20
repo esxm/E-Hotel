@@ -52,6 +52,7 @@ export default function GuestManagement() {
   const getStatusColor = (status) => {
     switch (status) {
       case 'confirmed': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      case 'booked': return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
       case 'checked-in': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
       case 'checked-out': return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
       case 'cancelled': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
@@ -62,6 +63,7 @@ export default function GuestManagement() {
   const getStatusIcon = (status) => {
     switch (status) {
       case 'confirmed': return '📋';
+      case 'booked': return '⏳';
       case 'checked-in': return '✅';
       case 'checked-out': return '🏁';
       case 'cancelled': return '❌';
@@ -74,34 +76,47 @@ export default function GuestManagement() {
     return hotel ? hotel.name : 'Unknown Hotel';
   };
 
+  const toJsDate = (value) => {
+    if (!value) return null;
+    // Firestore Timestamp compatibility
+    if (typeof value === 'object' && value !== null) {
+      if (typeof value.toDate === 'function') return value.toDate();
+      if (typeof value.seconds === 'number') return new Date(value.seconds * 1000);
+    }
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? null : d;
+  };
+
   const formatDate = (date) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString();
+    const js = toJsDate(date);
+    return js ? js.toLocaleDateString() : 'N/A';
   };
 
   const formatDateTime = (date) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleString();
+    const js = toJsDate(date);
+    return js ? js.toLocaleString() : 'N/A';
   };
 
   const getDuration = (checkIn, checkOut) => {
-    if (!checkIn || !checkOut) return 'N/A';
-    const start = new Date(checkIn);
-    const end = new Date(checkOut);
+    const start = toJsDate(checkIn);
+    const end = toJsDate(checkOut);
+    if (!start || !end) return 'N/A';
     const diffTime = Math.abs(end - start);
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
   };
 
-  const handleStatusUpdate = async (bookingId, newStatus) => {
+  const handleStatusUpdate = async (booking, newStatus) => {
     try {
       showLoading();
+      const hotelId = booking.hotelID;
+      const bookingId = booking.bookingID;
       if (newStatus === 'checked-in') {
-        await api.post(`/bookings/${bookingId}/checkin`);
+        await api.post(`/hotels/${hotelId}/bookings/${bookingId}/checkin`);
       } else if (newStatus === 'checked-out') {
-        await api.post(`/bookings/${bookingId}/checkout`);
+        await api.post(`/hotels/${hotelId}/bookings/${bookingId}/checkout`);
       } else if (newStatus === 'cancelled') {
-        await api.post(`/bookings/${bookingId}/cancel`);
+        await api.post(`/hotels/${hotelId}/bookings/${bookingId}/cancel`);
       }
       await loadData();
     } catch (error) {
@@ -148,6 +163,7 @@ export default function GuestManagement() {
               className="w-full border border-gray-300 dark:border-gray-600 rounded-md px-3 py-2 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
             >
               <option value="all">All Status</option>
+              <option value="booked">Booked</option>
               <option value="confirmed">Confirmed</option>
               <option value="checked-in">Checked In</option>
               <option value="checked-out">Checked Out</option>
@@ -289,16 +305,16 @@ export default function GuestManagement() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
-                        {booking.status === 'confirmed' && (
+                        {(booking.status === 'confirmed' || booking.status === 'booked') && (
                           <>
                             <button
-                              onClick={() => handleStatusUpdate(booking.bookingID, 'checked-in')}
+                              onClick={() => handleStatusUpdate(booking, 'checked-in')}
                               className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
                             >
                               Check In
                             </button>
                             <button
-                              onClick={() => handleStatusUpdate(booking.bookingID, 'cancelled')}
+                              onClick={() => handleStatusUpdate(booking, 'cancelled')}
                               className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
                             >
                               Cancel
@@ -307,7 +323,7 @@ export default function GuestManagement() {
                         )}
                         {booking.status === 'checked-in' && (
                           <button
-                            onClick={() => handleStatusUpdate(booking.bookingID, 'checked-out')}
+                            onClick={() => handleStatusUpdate(booking, 'checked-out')}
                             className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
                           >
                             Check Out

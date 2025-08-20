@@ -8,6 +8,14 @@ export default function Manager() {
   const [activeHotelId, setActiveHotelId] = useState("");
   const [activeTab, setActiveTab] = useState("overview");
   const [stats, setStats] = useState(null);
+  const [overview, setOverview] = useState({
+    roomsAvailable: 0,
+    roomsOccupied: 0,
+    roomsBooked: 0,
+    totalReceptionists: 0,
+    activeBookings: 0,
+    cancelledBookings: 0,
+  });
   const [period, setPeriod] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() + 1 });
   const [rooms, setRooms] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -27,6 +35,39 @@ export default function Manager() {
   const [hotelEditOpen, setHotelEditOpen] = useState(false);
   const [hotelForm, setHotelForm] = useState({ name: "", address: "", starRating: 3, totalRooms: 0, phone: "", email: "", description: "" });
 
+  // UI helpers for colored badges/cards
+  const roomStatusPill = (status) => {
+    switch ((status || '').toLowerCase()) {
+      case 'available':
+        return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      case 'occupied':
+        return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'booked':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200';
+    }
+  };
+
+  const metricCardClass = (type) => {
+    switch (type) {
+      case 'available':
+        return 'border-green-300 dark:border-green-700';
+      case 'occupied':
+        return 'border-red-300 dark:border-red-700';
+      case 'booked':
+        return 'border-blue-300 dark:border-blue-700';
+      case 'active':
+        return 'border-blue-300 dark:border-blue-700';
+      case 'cancelled':
+        return 'border-red-300 dark:border-red-700';
+      case 'warning':
+        return 'border-amber-300 dark:border-amber-700';
+      default:
+        return 'border-gray-200 dark:border-gray-700';
+    }
+  };
+
   useEffect(() => {
     loadHotels();
   }, []);
@@ -36,7 +77,16 @@ export default function Manager() {
     loadStats();
     loadRooms();
     loadBookings();
+    buildOverview();
+    // Do not load receptionists here to avoid unnecessary calls when tab not active
   }, [activeHotelId]);
+
+  // Load receptionists when the Reception tab is active or hotel changes
+  useEffect(() => {
+    if (activeTab !== 'reception') return;
+    if (!activeHotelId) return;
+    loadReceptionists();
+  }, [activeTab, activeHotelId]);
 
   async function loadHotels() {
     try {
@@ -72,6 +122,11 @@ export default function Manager() {
       showLoading();
       const { data } = await api.get(`/hotels/${activeHotelId}/rooms`);
       setRooms(data || []);
+      // Update part of overview
+      const available = (data || []).filter(r=>r.status==='available').length;
+      const occupied = (data || []).filter(r=>r.status==='occupied').length;
+      const booked = (data || []).filter(r=>r.status==='booked').length;
+      setOverview(o=>({ ...o, roomsAvailable: available, roomsOccupied: occupied, roomsBooked: booked }));
     } catch (e) {
       console.error("Failed to load rooms", e);
     } finally {
@@ -85,6 +140,9 @@ export default function Manager() {
       showLoading();
       const { data } = await api.get(`/hotels/${activeHotelId}/bookings`);
       setBookings(data || []);
+      const active = (data||[]).filter(b=>b.status==='checked-in').length;
+      const cancelled = (data||[]).filter(b=>b.status==='cancelled').length;
+      setOverview(o=>({ ...o, activeBookings: active, cancelledBookings: cancelled }));
     } catch (e) {
       console.error("Failed to load bookings", e);
     } finally {
@@ -98,11 +156,27 @@ export default function Manager() {
       showLoading();
       const { data } = await api.get(`/managers/${activeHotelId}/receptionists`);
       setReceptionists(data || []);
+      setOverview(o=>({ ...o, totalReceptionists: (data||[]).length }));
     } catch (e) {
       console.error('Failed to load receptionists', e);
     } finally {
       hideLoading();
     }
+  }
+
+  async function buildOverview() {
+    try {
+      // Fire a lightweight analytics call to ensure we have something if rooms/bookings not yet loaded
+      const { data } = await api.get(`/managers/${activeHotelId}/analytics`);
+      setOverview(o=>({
+        roomsAvailable: data.availableRooms ?? o.roomsAvailable,
+        roomsOccupied: data.occupiedRooms ?? o.roomsOccupied,
+        roomsBooked: o.roomsBooked, // booked is derived from rooms endpoint; keep existing
+        totalReceptionists: o.totalReceptionists,
+        activeBookings: data.activeBookings ?? o.activeBookings,
+        cancelledBookings: data.cancelledBookings ?? o.cancelledBookings,
+      }));
+    } catch {}
   }
 
   // Room actions
@@ -221,13 +295,17 @@ export default function Manager() {
               </select>
               <button onClick={()=>loadStats()} className="px-3 py-1 rounded bg-blue-600 text-white text-sm">Refresh</button>
             </div>
-            {stats && (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                <div className="p-4 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700"><div className="text-xs text-gray-500">Revenue</div><div className="text-2xl font-bold">${(stats.totalRevenue||0).toLocaleString()}</div></div>
-                <div className="p-4 rounded bg-white dark:bg-gray-800 border"><div className="text-xs text-gray-500">Occupancy</div><div className="text-2xl font-bold">{((stats.occupancyRate||0)*100).toFixed(1)}%</div></div>
-                <div className="p-4 rounded bg-white dark:bg-gray-800 border"><div className="text-xs text-gray-500">Cancellations</div><div className="text-2xl font-bold">{stats.cancellationCount||0}</div></div>
-              </div>
-            )}
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass()}`}><div className="text-xs text-gray-500">Revenue</div><div className="text-2xl font-bold">${(stats?.totalRevenue||0).toLocaleString()}</div></div>
+              <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass('warning')}`}><div className="text-xs text-gray-500">Occupancy (current)</div><div className="text-2xl font-bold">{(() => { const total = (overview.roomsAvailable||0) + (overview.roomsOccupied||0) + (overview.roomsBooked||0); const pct = total ? (overview.roomsOccupied/total)*100 : 0; return pct.toFixed(1); })()}%</div></div>
+              <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass('cancelled')}`}><div className="text-xs text-gray-500">Cancellations (month)</div><div className="text-2xl font-bold">{stats?.cancellationCount||0}</div></div>
+              <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass('available')}`}><div className="text-xs text-gray-500">Rooms Available</div><div className="text-2xl font-bold">{overview.roomsAvailable}</div></div>
+              <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass('occupied')}`}><div className="text-xs text-gray-500">Rooms Occupied</div><div className="text-2xl font-bold">{overview.roomsOccupied}</div></div>
+              <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass('booked')}`}><div className="text-xs text-gray-500">Rooms Booked</div><div className="text-2xl font-bold">{overview.roomsBooked}</div></div>
+              <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass()}`}><div className="text-xs text-gray-500">Receptionists</div><div className="text-2xl font-bold">{overview.totalReceptionists}</div></div>
+              <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass('active')}`}><div className="text-xs text-gray-500">Active Bookings</div><div className="text-2xl font-bold">{overview.activeBookings}</div></div>
+              <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass('cancelled')}`}><div className="text-xs text-gray-500">Cancelled Bookings</div><div className="text-2xl font-bold">{overview.cancelledBookings}</div></div>
+            </div>
           </div>
         )}
 
@@ -278,7 +356,7 @@ export default function Manager() {
                     <span className="text-sm">${r.pricePerNight || 0}/night</span>
                   </div>
                   <div className="flex items-center justify-between text-sm mb-3">
-                    <span className="px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700">{r.status}</span>
+                    <span className={`px-2 py-0.5 rounded-full ${roomStatusPill(r.status)}`}>{r.status}</span>
                     <span>Floor: {r.floor ?? '-'}</span>
                   </div>
                   <div className="flex gap-2">

@@ -7,8 +7,9 @@ import invoiceIcon from "../assets/invoice.png";
 import waitingIcon from "../assets/waiting.png";
 import ErrorToast from "./ErrorToast";
 import { useCustomer } from "../hooks/useCustomer";
+import api from "../lib/api";
 
-export default function BookingCard({ booking }) {
+export default function BookingCard({ booking, enableStaffActions = false, onUpdated }) {
   const [errorMsg, setErrorMsg] = useState("");
   const { role } = useAuth();
   const {
@@ -21,6 +22,25 @@ export default function BookingCard({ booking }) {
   const isStaff = ["Receptionist", "HotelManager", "SystemAdmin"].includes(
     role
   );
+
+  async function handleAction(action) {
+    try {
+      setErrorMsg("");
+      const hotelId = booking.hotelID || booking.hotelDetails?.hotelID || booking.hotelDetails?.id;
+      const bookingId = booking.bookingID;
+      if (!hotelId) throw new Error("Missing hotel ID");
+      if (action === "checkin") {
+        await api.post(`/hotels/${hotelId}/bookings/${bookingId}/checkin`);
+      } else if (action === "checkout") {
+        await api.post(`/hotels/${hotelId}/bookings/${bookingId}/checkout`);
+      } else if (action === "cancel") {
+        await api.post(`/hotels/${hotelId}/bookings/${bookingId}/cancel`);
+      }
+      if (onUpdated) onUpdated();
+    } catch (e) {
+      setErrorMsg(e.response?.data?.error || e.message);
+    }
+  }
 
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-300 dark:border-gray-600 p-6 hover:shadow-md transition-shadow duration-200">
@@ -164,6 +184,34 @@ export default function BookingCard({ booking }) {
         >
           View Details
         </Link>
+        {enableStaffActions && isStaff && (
+          <>
+            {booking.status === "booked" && (
+              <>
+                <button
+                  onClick={() => handleAction("checkin")}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-green-600 bg-green-50 hover:bg-green-100 dark:bg-green-900/30 dark:text-green-300"
+                >
+                  Check In
+                </button>
+                <button
+                  onClick={() => handleAction("cancel")}
+                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-300"
+                >
+                  Cancel
+                </button>
+              </>
+            )}
+            {booking.status === "checked-in" && (
+              <button
+                onClick={() => handleAction("checkout")}
+                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300"
+              >
+                Check Out
+              </button>
+            )}
+          </>
+        )}
         {booking.hasInvoice && (
           <Link
             to={`/bookings/${booking.bookingID}/invoice`}

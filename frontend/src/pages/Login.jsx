@@ -16,9 +16,24 @@ export default function Login() {
   const { showLoading, hideLoading } = useLoading();
 
   useEffect(() => {
-    const unsubscribe = auth.onAuthStateChanged((user) => {
+    const unsubscribe = auth.onAuthStateChanged(async (user) => {
       if (user) {
-        navigate("/");
+        // Determine role to redirect appropriately
+        try {
+          const token = await user.getIdTokenResult();
+          const role = token?.claims?.role || "Customer";
+          if (role === "Receptionist") {
+            navigate("/receptionist", { replace: true });
+          } else if (role === "HotelManager") {
+            navigate("/manager", { replace: true });
+          } else if (role === "SystemAdmin") {
+            navigate("/admin", { replace: true });
+          } else {
+            navigate("/", { replace: true });
+          }
+        } catch (_) {
+          navigate("/", { replace: true });
+        }
       }
     });
 
@@ -31,9 +46,23 @@ export default function Login() {
     setSuccessMsg("");
     try {
       showLoading();
-      await signInWithEmailAndPassword(auth, email, pw);
+      const cred = await signInWithEmailAndPassword(auth, email, pw);
       setSuccessMsg("Login successful");
-      navigate("/");
+      try {
+        const token = await cred.user.getIdTokenResult();
+        const role = token?.claims?.role || "Customer";
+        if (role === "Receptionist") {
+          navigate("/receptionist", { replace: true });
+        } else if (role === "HotelManager") {
+          navigate("/manager", { replace: true });
+        } else if (role === "SystemAdmin") {
+          navigate("/admin", { replace: true });
+        } else {
+          navigate("/", { replace: true });
+        }
+      } catch (_) {
+        navigate("/", { replace: true });
+      }
     } catch (e) {
       setErrorMsg(e.message);
     } finally {

@@ -84,7 +84,7 @@ router.post("/", role("Customer", "Receptionist"), async (req, res) => {
 
 router.post(
   "/:bookingId/cancel",
-  role("Customer", "Receptionist"),
+  role("Customer", "Receptionist", "SystemAdmin"),
   async (req, res) => {
     try {
       const userRole = req.user.role;
@@ -93,6 +93,8 @@ router.post(
           return await bookingCtrl.cancelCustomer(req, res);
         case "Receptionist":
           return await bookingCtrl.cancelReceptionist(req, res);
+        case "SystemAdmin":
+          return await bookingCtrl.cancelByAdmin(req, res);
         default:
           return res.status(403).json({ error: "Unauthorized role" });
       }

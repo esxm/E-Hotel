@@ -71,19 +71,27 @@ exports.cancel = async (req, res) => {
 };
 
 exports.getById = async (req, res) => {
-  const booking = await bookingSvc.getBookingById(req.params.bookingId, {
-    staffId: req.user.id,
-  });
-  if (!booking) return res.status(404).json({ message: "Booking not found" });
-  res.json(booking);
+  try {
+    const booking = await bookingSvc.getBookingById(req.params.bookingId, {
+      staffId: req.user.id,
+    });
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    res.json(booking);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 };
 
 exports.getByIdMine = async (req, res) => {
-  const booking = await bookingSvc.getBookingById(req.params.bookingId, {
-    customerId: req.user.id,
-  });
-  if (!booking) return res.status(404).json({ message: "Booking not found" });
-  res.json(booking);
+  try {
+    const booking = await bookingSvc.getBookingById(req.params.bookingId, {
+      customerId: req.user.id,
+    });
+    if (!booking) return res.status(404).json({ message: "Booking not found" });
+    res.json(booking);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
 };
 
 exports.createCustomer = async (req, res) => {
@@ -221,6 +229,34 @@ exports.cancelReceptionist = async (req, res) => {
   }
 };
 
+// Allow SystemAdmin to cancel any booking by ID
+exports.cancelByAdmin = async (req, res) => {
+  try {
+    const bookingDoc = await db
+      .collection("bookings")
+      .doc(req.params.bookingId)
+      .get();
+    if (!bookingDoc.exists) {
+      return res.status(404).json({ error: "Booking not found" });
+    }
+    const bookingData = bookingDoc.data();
+
+    const result = await bookingSvc.cancelBooking({
+      hotelId: bookingData.hotelID,
+      bookingID: req.params.bookingId,
+      canceledBy: req.user.uid,
+    });
+
+    if (result.error) {
+      return res.status(400).json({ error: result.error });
+    }
+
+    res.status(200).json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+};
+
 exports.createBooking = async (req, res) => {
   try {
     const result = await bookingSvc.createBooking(req.body);
@@ -266,7 +302,10 @@ exports.cancelBooking = async (req, res) => {
 
 exports.checkInBooking = async (req, res) => {
   try {
-    const result = await bookingSvc.checkInBooking(req.body);
+    const result = await bookingSvc.checkInBooking({
+      hotelId: req.params.hotelId || req.body.hotelId,
+      bookingID: req.params.bookingId || req.body.bookingID,
+    });
     if (result.error) {
       return res.status(400).json({ error: result.error });
     }
@@ -278,7 +317,10 @@ exports.checkInBooking = async (req, res) => {
 
 exports.checkOutBooking = async (req, res) => {
   try {
-    const result = await bookingSvc.checkOutBooking(req.body);
+    const result = await bookingSvc.checkOutBooking({
+      hotelId: req.params.hotelId || req.body.hotelId,
+      bookingID: req.params.bookingId || req.body.bookingID,
+    });
     if (result.error) {
       return res.status(400).json({ error: result.error });
     }

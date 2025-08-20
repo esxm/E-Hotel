@@ -28,6 +28,7 @@ import ServiceBooking from "./pages/ServiceBooking";
 import ServiceCapacityDashboard from "./pages/ServiceCapacityDashboard";
 import NotFound from "./pages/NotFound";
 import Admin from "./pages/Admin";
+import ReceptionCancellations from "./pages/ReceptionCancellations";
 
 function AppContent() {
   const { isLoading } = useLoading();
@@ -85,6 +86,22 @@ function AppContent() {
             element={
               <Protected roles={["Receptionist", "SystemAdmin"]}>
                 <Reception />
+              </Protected>
+            }
+          />
+          <Route
+            path="/receptionist"
+            element={
+              <Protected roles={["Receptionist", "SystemAdmin"]}>
+                <Reception />
+              </Protected>
+            }
+          />
+          <Route
+            path="/reception/cancellations"
+            element={
+              <Protected roles={["Receptionist", "SystemAdmin"]}>
+                <ReceptionCancellations />
               </Protected>
             }
           />

@@ -3,6 +3,7 @@
  * @class Booking
  * @prop {string} bookingID
  * @prop {string} customerID
+ * @prop {string} hotelID                // hotel document ID
  * @prop {Object} hotelDetails           // hotel name, address, star rating
  * @prop {Room[]} roomDetails            // array of Room instances or plain objects
  * @prop {Date} checkInDate
@@ -19,6 +20,7 @@ class Booking {
   constructor({
     bookingID,
     customerID,
+    hotelID,
     hotelDetails,
     roomDetails,
     checkInDate,
@@ -33,6 +35,7 @@ class Booking {
   }) {
     this.bookingID = bookingID;
     this.customerID = customerID;
+    this.hotelID = hotelID;
     this.hotelDetails = hotelDetails;
     this.roomDetails = roomDetails;
     this.checkInDate = checkInDate;
