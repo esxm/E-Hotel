@@ -1,0 +1,106 @@
+﻿@startuml
+' Vertical layout
+skinparam shadowing false
+skinparam packageStyle rectangle
+top to bottom direction
+
+actor Customer
+actor Receptionist
+actor "Hotel Manager" as Manager
+actor SystemAdmin as Admin
+
+package "Customer's Activities" {
+  usecase UC_Browse as "Browse rooms & availability"
+  usecase UC_Book as "Create booking"
+  usecase UC_Cancel as "Cancel booking"
+  usecase UC_ViewInvoice as "View invoice"
+  usecase UC_ServiceBook as "Book service"
+  usecase UC_ServiceCancel as "Cancel service booking"
+  usecase UC_CheckAvail as "Check room availability"
+  usecase UC_Penalty as "Penalty handling"
+}
+
+package "Receptionist's Activities" {
+  usecase R_CreateBooking as "Create booking (for guest)"
+  usecase R_CancelBooking as "Cancel booking"
+  usecase R_CheckIn as "Check-in guest"
+  usecase R_CheckOut as "Check-out guest"
+  usecase R_InvoiceOps as "Generate/update invoice"
+  usecase R_ServiceBook as "Book service"
+  usecase R_ServiceCancel as "Cancel service booking"
+  usecase R_GuestHistory as "View guest history"
+  usecase R_MaintReq as "Log maintenance request"
+  usecase R_UpdateRoom as "Update room status"
+  usecase R_GenInvoice as "Generate invoice"
+}
+
+package "Manager's Activities" {
+  usecase M_ManageHotel as "Manage hotel"
+  usecase M_ManageRooms as "Manage rooms (pricing/type/status)"
+  usecase M_ManageServices as "Manage services"
+  usecase M_ManageCapacity as "Manage capacity & resources"
+  usecase M_Analytics as "View hotel analytics"
+  usecase M_SetCapacity as "Set service capacity"
+  usecase M_ResMgmt as "Manage service resources"
+}
+
+package "Admin's Activities" {
+  usecase A_Users as "Manage users & roles"
+  usecase A_Hotels as "Manage hotels & assignments"
+  usecase A_Analytics as "View system analytics (time-series)"
+  usecase A_Maint as "Review maintenance"
+}
+
+package "AI Features" {
+  usecase AI_Risk as "AI: Cancellation risk"
+  usecase AI_Anom as "AI: Detect anomalies"
+  usecase AI_Revenue as "AI: Revenue coaching"
+  usecase AI_Overbook as "AI: Overbooking buffer"
+}
+
+Customer --> UC_Browse
+Customer --> UC_Book
+Customer --> UC_Cancel
+Customer --> UC_ViewInvoice
+Customer --> UC_ServiceBook
+Customer --> UC_ServiceCancel
+
+Receptionist --> R_CreateBooking
+Receptionist --> R_CancelBooking
+Receptionist --> R_CheckIn
+Receptionist --> R_CheckOut
+Receptionist --> R_InvoiceOps
+Receptionist --> R_ServiceBook
+Receptionist --> R_ServiceCancel
+Receptionist --> R_GuestHistory
+Receptionist --> R_MaintReq
+Receptionist --> AI_Risk
+
+Manager --> M_ManageHotel
+Manager --> M_ManageRooms
+Manager --> M_ManageServices
+Manager --> M_ManageCapacity
+Manager --> M_Analytics
+Manager --> AI_Risk
+Manager --> AI_Anom
+Manager --> AI_Revenue
+Manager --> AI_Overbook
+
+Admin --> A_Users
+Admin --> A_Hotels
+Admin --> A_Analytics
+Admin --> A_Maint
+Admin --> AI_Anom
+Admin --> AI_Revenue
+
+UC_Book ..> UC_CheckAvail : <<include>>
+UC_Cancel ..> UC_Penalty : <<include>>
+R_CheckIn ..> R_UpdateRoom : <<include>>
+R_CheckOut ..> R_GenInvoice : <<include>>
+M_ManageCapacity ..> M_SetCapacity : <<include>>
+M_ManageCapacity ..> M_ResMgmt : <<include>>
+R_ServiceBook ..> M_SetCapacity : <<include>>\n(capacity check)
+R_ServiceBook ..> M_ResMgmt : <<include>>\n(resource reserve)
+UC_ServiceBook ..> M_SetCapacity : <<include>>\n(capacity check)
+
+@enduml

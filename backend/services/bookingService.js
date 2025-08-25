@@ -335,7 +335,8 @@ exports.cancelBooking = async ({ hotelId, bookingID, canceledBy }) => {
     if (!doc.exists) throw new Error("Booking not found");
     const data = doc.data();
     if (data.hotelID !== hotelId) throw new Error("Wrong hotel");
-    if (data.status !== "booked" && data.status !== "checked-in")
+    // Allow cancelling 'booked', 'confirmed' (pre‑stay), and 'checked-in' (with full penalty)
+    if (data.status !== "booked" && data.status !== "confirmed" && data.status !== "checked-in")
       throw new Error("Cannot cancel");
 
     const now = new Date();
@@ -457,7 +458,7 @@ exports.checkInBooking = async ({ hotelId, bookingID }) => {
     if (!doc.exists) return { error: "Booking not found" };
     const data = doc.data();
     if (data.hotelID !== hotelId) return { error: "Wrong hotel" };
-    if (data.status !== "booked") return { error: "Cannot check in" };
+    if (data.status !== "booked" && data.status !== "confirmed") return { error: "Cannot check in" };
 
     await bookingsCol.doc(bookingID).update({ status: "checked-in" });
     await Promise.all(

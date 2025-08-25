@@ -1,26 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import api from '../../lib/api';
 import { useLoading } from '../../contexts/LoadingContext';
 
 export default function Analytics() {
   const { showLoading, hideLoading } = useLoading();
-  const [analyticsData, setAnalyticsData] = useState({
-    revenue: {
-      daily: [],
-      monthly: [],
-      yearly: []
-    },
-    occupancy: {
-      daily: [],
-      monthly: [],
-      yearly: []
-    },
-    bookings: {
-      daily: [],
-      monthly: [],
-      yearly: []
-    }
-  });
+  const [series, setSeries] = useState({ revenue: [], occupancy: [], bookings: [], range: 'monthly' });
   const [timeRange, setTimeRange] = useState('monthly');
   const [selectedMetric, setSelectedMetric] = useState('revenue');
 
@@ -31,10 +15,8 @@ export default function Analytics() {
   async function loadAnalyticsData() {
     try {
       showLoading();
-      // In a real implementation, you would fetch analytics data from the API
-      // For now, we'll generate mock data
-      const mockData = generateMockAnalyticsData(timeRange);
-      setAnalyticsData(mockData);
+      const { data } = await api.get(`/admin/analytics/timeseries`, { params: { range: timeRange } });
+      setSeries({ revenue: data.revenue || [], occupancy: data.occupancy || [], bookings: data.bookings || [], range: data.range || timeRange });
     } catch (error) {
       console.error('Error loading analytics data:', error);
     } finally {
@@ -42,66 +24,16 @@ export default function Analytics() {
     }
   }
 
-  const generateMockAnalyticsData = (range) => {
-    const data = {
-      revenue: { daily: [], monthly: [], yearly: [] },
-      occupancy: { daily: [], monthly: [], yearly: [] },
-      bookings: { daily: [], monthly: [], yearly: [] }
-    };
-
-    const now = new Date();
-    const periods = range === 'daily' ? 30 : range === 'monthly' ? 12 : 5;
-
-    for (let i = periods - 1; i >= 0; i--) {
-      const date = new Date(now);
-      if (range === 'daily') {
-        date.setDate(date.getDate() - i);
-      } else if (range === 'monthly') {
-        date.setMonth(date.getMonth() - i);
-      } else {
-        date.setFullYear(date.getFullYear() - i);
-      }
-
-      const label = range === 'daily' 
-        ? date.toLocaleDateString() 
-        : range === 'monthly' 
-        ? date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-        : date.getFullYear().toString();
-
-      data.revenue[range].push({
-        label,
-        value: Math.floor(Math.random() * 50000) + 10000,
-        change: (Math.random() - 0.5) * 20
-      });
-
-      data.occupancy[range].push({
-        label,
-        value: Math.floor(Math.random() * 40) + 60,
-        change: (Math.random() - 0.5) * 10
-      });
-
-      data.bookings[range].push({
-        label,
-        value: Math.floor(Math.random() * 200) + 50,
-        change: (Math.random() - 0.5) * 15
-      });
-    }
-
-    return data;
-  };
-
   const getMetricData = () => {
-    return analyticsData[selectedMetric][timeRange] || [];
+    return series[selectedMetric] || [];
   };
 
   const getMetricInfo = () => {
     const data = getMetricData();
     if (data.length === 0) return { total: 0, change: 0, avg: 0 };
-
-    const total = data.reduce((sum, item) => sum + item.value, 0);
+    const total = data.reduce((sum, item) => sum + (Number(item.value)||0), 0);
     const avg = total / data.length;
-    const change = data.length > 1 ? data[data.length - 1].change : 0;
-
+    const change = data.length > 1 ? ((data[data.length-1].value - data[data.length-2].value) / (data[data.length-2].value||1)) * 100 : 0;
     return { total, change, avg };
   };
 
@@ -114,6 +46,37 @@ export default function Analytics() {
       return value.toLocaleString();
     }
   };
+
+  const Chart = useMemo(() => {
+    const data = getMetricData();
+    if (data.length === 0) return null;
+    const maxVal = Math.max(...data.map(d => Number(d.value)||0)) || 1;
+    const minVal = 0;
+    const width = 900;
+    const height = 280;
+    const pad = 40;
+    const toX = (i) => pad + (i * (width - pad * 2)) / Math.max(1, data.length - 1);
+    const toY = (v) => height - pad - ((v - minVal) / (maxVal - minVal)) * (height - pad * 2);
+    const path = data.map((d,i)=> `${i===0?'M':'L'} ${toX(i)} ${toY(d.value)}`).join(' ');
+    const grid = Array.from({length:5}).map((_,i)=>{
+      const y = pad + i*((height-pad*2)/4);
+      return <line key={i} x1={pad} y1={y} x2={width-pad} y2={y} stroke="#e5e7eb" opacity="0.7" strokeWidth="1" />
+    });
+    return (
+      <svg width="100%" viewBox={`0 0 ${width} ${height}`} className="block">
+        <rect x="0" y="0" width={width} height={height} fill="transparent" />
+        {grid}
+        <path d={path} fill="none" stroke="#3b82f6" strokeWidth="3" />
+        {data.map((d,i)=> (
+          <circle key={i} cx={toX(i)} cy={toY(d.value)} r="3" fill="#1d4ed8" />
+        ))}
+        {data.map((d,i)=> (
+          <text key={`lbl-${i}`} x={toX(i)} y={height - pad/2} textAnchor="middle" fontSize="10" fill="#6b7280">{d.label}</text>
+        ))}
+      </svg>
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [series, selectedMetric]);
 
   return (
     <div className="p-6">
@@ -184,29 +147,11 @@ export default function Analytics() {
         </div>
 
         {/* Chart */}
-        <div className="bg-white dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600">
+        <div className="bg-white dark:bg-gray-700 rounded-lg p-6 border border-gray-200 dark:border-gray-600 overflow-x-auto">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
             {selectedMetric.charAt(0).toUpperCase() + selectedMetric.slice(1)} Trend
           </h3>
-          
-          <div className="h-64 flex items-end justify-between space-x-2">
-            {getMetricData().map((item, index) => {
-              const maxValue = Math.max(...getMetricData().map(d => d.value));
-              const height = (item.value / maxValue) * 100;
-              
-              return (
-                <div key={index} className="flex-1 flex flex-col items-center">
-                  <div className="w-full bg-blue-500 rounded-t" style={{ height: `${height}%` }}></div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
-                    {item.label}
-                  </div>
-                  <div className="text-xs font-medium text-gray-900 dark:text-white mt-1">
-                    {formatValue(item.value, selectedMetric)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          {Chart}
         </div>
 
         {/* Additional Analytics */}

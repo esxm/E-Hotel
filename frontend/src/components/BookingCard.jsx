@@ -11,6 +11,7 @@ import api from "../lib/api";
 
 export default function BookingCard({ booking, enableStaffActions = false, onUpdated }) {
   const [errorMsg, setErrorMsg] = useState("");
+  const [ai, setAi] = useState(null);
   const { role } = useAuth();
   const {
     customer,
@@ -37,6 +38,16 @@ export default function BookingCard({ booking, enableStaffActions = false, onUpd
         await api.post(`/hotels/${hotelId}/bookings/${bookingId}/cancel`);
       }
       if (onUpdated) onUpdated();
+    } catch (e) {
+      setErrorMsg(e.response?.data?.error || e.message);
+    }
+  }
+
+  async function fetchRisk() {
+    try {
+      setErrorMsg("");
+      const resp = await api.post(`/ai/cancel-risk/${booking.bookingID}`);
+      setAi(resp.data);
     } catch (e) {
       setErrorMsg(e.response?.data?.error || e.message);
     }
@@ -177,6 +188,26 @@ export default function BookingCard({ booking, enableStaffActions = false, onUpd
           </p>
         </div>
       </div>
+      {ai && (
+        <div className="mt-4 p-3 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 text-amber-900 dark:text-amber-200 text-sm space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="font-medium">AI Risk: {ai.label} ({ai.riskScore}%)</span>
+            <span className={`px-2 py-0.5 rounded text-xs ${ai.label==='high'?'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200':ai.label==='medium'?'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200':'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'}`}>{ai.label}</span>
+          </div>
+          <div>{ai.reason}</div>
+          {Array.isArray(ai.actions) && ai.actions.length>0 && (
+            <ul className="list-disc ml-5">
+              {ai.actions.map((a,i)=>(<li key={i}>{a}</li>))}
+            </ul>
+          )}
+          {ai.messageTemplate && (
+            <div className="mt-2">
+              <div className="text-xs font-medium mb-1">Suggested message</div>
+              <div className="p-2 rounded bg-white dark:bg-gray-800 border border-amber-200 dark:border-amber-700">{ai.messageTemplate}</div>
+            </div>
+          )}
+        </div>
+      )}
       <div className="mt-6 flex gap-4">
         <Link
           to={`/bookings/${booking.bookingID}`}
@@ -184,6 +215,14 @@ export default function BookingCard({ booking, enableStaffActions = false, onUpd
         >
           View Details
         </Link>
+        {enableStaffActions && (
+          <button
+            onClick={fetchRisk}
+            className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-amber-600 hover:bg-amber-700"
+          >
+            AI Risk
+          </button>
+        )}
         {enableStaffActions && isStaff && (
           <>
             {booking.status === "booked" && (

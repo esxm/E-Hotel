@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../lib/api';
 import { useLoading } from '../../contexts/LoadingContext';
+import ErrorToast from '../ErrorToast';
 
 export default function GuestManagement() {
   const { showLoading, hideLoading } = useLoading();
@@ -20,6 +21,8 @@ export default function GuestManagement() {
     checkInDate: '',
     checkOutDate: ''
   });
+  const [errorMsg, setErrorMsg] = useState('');
+  const [riskMap, setRiskMap] = useState({}); // bookingID -> { label, riskScore }
 
   useEffect(() => {
     loadData();
@@ -71,6 +74,37 @@ export default function GuestManagement() {
     }
   };
 
+  const riskBadgeClass = (label) => {
+    switch (label) {
+      case 'high': return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+      case 'medium': return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200';
+      case 'low': return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+      default: return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    }
+  };
+
+  const fetchRisk = async (bookingId, { silent = false } = {}) => {
+    try {
+      if (!silent) showLoading();
+      const resp = await api.post(`/ai/cancel-risk/${bookingId}`);
+      setRiskMap((m)=>({ ...m, [bookingId]: resp.data }));
+    } catch (e) {
+      console.error('AI risk failed', e);
+    } finally {
+      if (!silent) hideLoading();
+    }
+  };
+
+  // Auto-fetch risk for a small batch of booked/confirmed rows when bookings change
+  useEffect(() => {
+    if (!Array.isArray(bookings) || bookings.length === 0) return;
+    const candidates = bookings.filter(b => (b.status === 'booked' || b.status === 'confirmed') && !riskMap[b.bookingID]).slice(0, 8);
+    if (candidates.length === 0) return;
+    (async () => {
+      await Promise.allSettled(candidates.map(b => fetchRisk(b.bookingID, { silent: true })));
+    })();
+  }, [bookings]);
+
   const getHotelName = (hotelID) => {
     const hotel = hotels.find(h => h.hotelID === hotelID);
     return hotel ? hotel.name : 'Unknown Hotel';
@@ -121,6 +155,8 @@ export default function GuestManagement() {
       await loadData();
     } catch (error) {
       console.error('Error updating booking status:', error);
+      const msg = error?.response?.data?.error || error.message || 'Action failed';
+      setErrorMsg(msg);
     } finally {
       hideLoading();
     }
@@ -128,6 +164,7 @@ export default function GuestManagement() {
 
   return (
     <div className="p-6">
+      <ErrorToast message={errorMsg} onClose={()=>setErrorMsg('')} />
       <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
         Guest Management
       </h2>
@@ -250,6 +287,9 @@ export default function GuestManagement() {
                     Amount
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    Risk
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                     Status
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
@@ -294,6 +334,15 @@ export default function GuestManagement() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
                       ${booking.totalAmount || 0}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                      {riskMap[booking.bookingID] ? (
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${riskBadgeClass(riskMap[booking.bookingID].label)}`} title={`Risk ${riskMap[booking.bookingID].riskScore}%`}>
+                          {riskMap[booking.bookingID].label} {riskMap[booking.bookingID].riskScore}%
+                        </span>
+                      ) : (
+                        <button onClick={()=>fetchRisk(booking.bookingID)} className="text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 text-xs">Get Risk</button>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">

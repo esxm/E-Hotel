@@ -660,4 +660,152 @@ router.get("/revenue/analytics", async (req, res) => {
   }
 });
 
+// Time-series analytics (admin-wide across all hotels)
+router.get("/analytics/timeseries", async (req, res) => {
+  try {
+    const range = (req.query.range || "monthly").toLowerCase(); // daily|monthly|yearly
+    const now = new Date();
+    const periods = range === "daily" ? 30 : range === "monthly" ? 12 : 5;
+
+    // Fetch required data in one pass
+    const [bookingsSnap, roomsSnap] = await Promise.all([
+      db.collection("bookings").get(),
+      db.collection("rooms").get(),
+    ]);
+    const totalRooms = roomsSnap.size || 1; // avoid divide by zero
+
+    // Build period boundaries
+    const buckets = [];
+    for (let i = periods - 1; i >= 0; i--) {
+      if (range === "daily") {
+        const dStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        const dEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i + 1);
+        const label = dStart.toLocaleDateString();
+        buckets.push({ key: label, start: dStart, end: dEnd, revenue: 0, bookings: 0, occupiedNights: 0, days: 1 });
+      } else if (range === "monthly") {
+        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const start = new Date(d.getFullYear(), d.getMonth(), 1);
+        const end = new Date(d.getFullYear(), d.getMonth() + 1, 1);
+        const label = d.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        buckets.push({ key: label, start, end, revenue: 0, bookings: 0, occupiedNights: 0, days: Math.round((end - start) / 86400000) });
+      } else {
+        const year = now.getFullYear() - i;
+        const start = new Date(year, 0, 1);
+        const end = new Date(year + 1, 0, 1);
+        const label = String(year);
+        buckets.push({ key: label, start, end, revenue: 0, bookings: 0, occupiedNights: 0, days: ((end - start) / 86400000) });
+      }
+    }
+
+    // Helper to find bucket index for a date
+    const idxFor = (date) => buckets.findIndex((b) => date >= b.start && date < b.end);
+
+    // Aggregate bookings
+    bookingsSnap.docs.forEach((doc) => {
+      const b = doc.data();
+      const ci = b.checkInDate?.toDate ? b.checkInDate.toDate() : (b.checkInDate ? new Date(b.checkInDate) : null);
+      const co = b.checkOutDate?.toDate ? b.checkOutDate.toDate() : (b.checkOutDate ? new Date(b.checkOutDate) : null);
+      const checkedOutAt = b.checkedOutAt?.toDate ? b.checkedOutAt.toDate() : null;
+
+      // revenue: when checked-out within the period
+      if (checkedOutAt) {
+        const i = idxFor(checkedOutAt);
+        if (i >= 0) buckets[i].revenue += Number(b.totalAmount || 0);
+      }
+
+      // bookings: count check-in within the period
+      if (ci) {
+        const i = idxFor(ci);
+        if (i >= 0) buckets[i].bookings += 1;
+      }
+
+      // occupancy: add overlapping nights within each bucket range for checked-in/checked-out bookings
+      if (ci && co && (b.status === "checked-in" || b.status === "checked-out")) {
+        buckets.forEach((bucket) => {
+          const start = bucket.start;
+          const end = bucket.end;
+          const overlapStart = ci > start ? ci : start;
+          const overlapEnd = co < end ? co : end;
+          const nights = Math.max(0, Math.round((overlapEnd - overlapStart) / 86400000));
+          if (nights > 0) bucket.occupiedNights += nights;
+        });
+      }
+    });
+
+    // Build result arrays
+    const revenue = buckets.map((b) => ({ label: b.key, value: Math.round(b.revenue) }));
+    const bookings = buckets.map((b) => ({ label: b.key, value: b.bookings }));
+    const occupancy = buckets.map((b) => ({
+      label: b.key,
+      value: Math.round(((b.occupiedNights / (totalRooms * b.days)) * 100) * 10) / 10,
+    }));
+
+    res.json({ range, revenue, occupancy, bookings });
+  } catch (error) {
+    console.error("Error building analytics series:", error);
+    res.status(500).json({ error: "Failed to build analytics series" });
+  }
+});
+// ---- Admin To-Do (per hotel) ----
+router.get("/hotels/:hotelId/todos", async (req, res) => {
+  try {
+    const snap = await db
+      .collection("adminTodos")
+      .where("hotelID", "==", req.params.hotelId)
+      .get();
+    const list = snap.docs
+      .map((d) => ({ todoID: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate?.() || null }))
+      .sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0));
+    res.json(list);
+  } catch (error) {
+    console.error("Error fetching todos:", error);
+    res.status(500).json({ error: "Failed to fetch todos" });
+  }
+});
+
+router.post("/hotels/:hotelId/todos", async (req, res) => {
+  try {
+    const text = (req.body.text || "").toString().trim();
+    if (!text) return res.status(400).json({ error: "Text required" });
+    const payload = {
+      hotelID: req.params.hotelId,
+      text,
+      completed: false,
+      createdAt: admin.firestore.Timestamp.now(),
+      createdBy: req.user?.uid || null,
+    };
+    const ref = await db.collection("adminTodos").add(payload);
+    const doc = await ref.get();
+    res.status(201).json({ todoID: ref.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate?.() || null });
+  } catch (error) {
+    console.error("Error creating todo:", error);
+    res.status(500).json({ error: "Failed to create todo" });
+  }
+});
+
+router.patch("/todos/:todoId", async (req, res) => {
+  try {
+    const updates = {};
+    if (typeof req.body.text === "string") updates.text = req.body.text;
+    if (typeof req.body.completed === "boolean") updates.completed = req.body.completed;
+    updates.updatedAt = admin.firestore.Timestamp.now();
+    await db.collection("adminTodos").doc(req.params.todoId).update(updates);
+    const doc = await db.collection("adminTodos").doc(req.params.todoId).get();
+    res.json({ todoID: doc.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate?.() || null });
+  } catch (error) {
+    console.error("Error updating todo:", error);
+    res.status(500).json({ error: "Failed to update todo" });
+  }
+});
+
+router.delete("/todos/:todoId", async (req, res) => {
+  try {
+    await db.collection("adminTodos").doc(req.params.todoId).delete();
+    res.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting todo:", error);
+    res.status(500).json({ error: "Failed to delete todo" });
+  }
+});
+
 module.exports = router;

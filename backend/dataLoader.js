@@ -146,10 +146,13 @@ async function seed() {
     users.push(await admin.auth().getUser(temp.uid));
   }
 
-  // Create customers
-  for (let i = 0; i < 10; i++) {
-    const name = customerNames[i];
-    const email = `${name.toLowerCase().replace(" ", ".")}@example.com`;
+  // Create customers (more volume for AI testing)
+  const NUM_CUSTOMERS = 30;
+  for (let i = 0; i < NUM_CUSTOMERS; i++) {
+    const baseName = customerNames[i % customerNames.length];
+    const name = i < customerNames.length ? baseName : `${baseName} ${Math.floor(i / customerNames.length)}`;
+    const emailBase = baseName.toLowerCase().replace(" ", ".");
+    const email = `${emailBase}${i >= customerNames.length ? `.${i}` : ""}@example.com`;
     const temp = await admin.auth().createUser({ email, password: "123456" });
     users.push(await admin.auth().getUser(temp.uid));
   }
@@ -157,7 +160,7 @@ async function seed() {
   /* partition */
   const managers = users.slice(0, 5);
   const receptionists = users.slice(5, 10);
-  const customers = users.slice(10, 20);
+  const customers = users.slice(10, 10 + NUM_CUSTOMERS);
 
   /* assign custom claims & Firestore docs */
   console.log("✨ Managers");
@@ -190,7 +193,9 @@ async function seed() {
       .collection("customers")
       .doc(u.uid)
       .set({
-        name: customerNames[i],
+        name: (i < customerNames.length)
+          ? customerNames[i]
+          : `${customerNames[i % customerNames.length]} ${Math.floor(i / customerNames.length)}`,
         phoneNumber: `+123456789${i}`,
         idType: ["passport", "id_card", "driver_license"][i % 3],
         idNumber: `ID${i + 1}`,
@@ -414,7 +419,7 @@ async function seed() {
       name: `Hotel ${h}`,
       address: `${h} Main`,
       starRating: 3 + (h % 3),
-      totalRooms: 5,
+      totalRooms: 15,
       description: `Welcome to Hotel ${h}, a ${
         3 + (h % 3)
       }-star establishment located in the heart of the city. Our hotel offers comfortable accommodations and excellent service to make your stay memorable.`,
@@ -434,7 +439,7 @@ async function seed() {
       .doc(receptionists[h - 1].uid)
       .update({ hotelID });
 
-    for (let r = 1; r <= 5; r++) {
+    for (let r = 1; r <= 15; r++) {
       const rid = await add("rooms", {
         hotelID,
         roomNumber: (h * 100 + r).toString(),
@@ -502,29 +507,37 @@ async function seed() {
   const bookings = [];
   for (let i = 0; i < customers.length; i++) {
     const cust = customers[i];
-    for (let b = 0; b < 5; b++) {
+    // more bookings per customer to create variance
+    for (let b = 0; b < 8; b++) {
       const hotelID = hotelIDs[(i + b) % hotelIDs.length];
-      const roomID = roomIDs[hotelID][b];
-      const ci = new Date(now.getTime() + (i * 5 + b) * 864e5);
-      const co = new Date(ci.getTime() + 2 * 864e5);
+      const roomID = roomIDs[hotelID][(b * 3) % roomIDs[hotelID].length];
+      // distribute across past and future (-45..+45 days)
+      const offsetDays = Math.floor(rand() * 91) - 45;
+      const ci = new Date(now.getTime() + offsetDays * 864e5);
+      const nights = 1 + Math.floor(rand() * 3);
+      const co = new Date(ci.getTime() + nights * 864e5);
 
-      // Determine booking status based on index
+      // Determine booking status using offset and randomness
       let status;
       let checkedOutAt = null;
-      if (b === 0) {
-        status = "booked"; // First booking is booked
-      } else if (b === 1) {
-        status = "checked-in"; // Second booking is checked-in
-      } else if (b === 2) {
-        status = "checked-out"; // Third booking is checked-out
-        checkedOutAt = new Date(ci.getTime() + 1 * 864e5);
-      } else if (b === 3) {
-        status = "cancelled"; // Fourth booking is cancelled
+      if (offsetDays > 2) {
+        status = rand() < 0.7 ? "booked" : "confirmed"; // future pipeline
+      } else if (offsetDays >= -1 && offsetDays <= 2) {
+        status = "checked-in"; // currently staying
       } else {
-        status = "booked"; // Fifth booking is booked
+        // past
+        const r = rand();
+        if (r < 0.4) {
+          status = "checked-out";
+          checkedOutAt = new Date(ci.getTime() + (nights - 1) * 864e5);
+        } else if (r < 0.7) {
+          status = "cancelled";
+        } else {
+          status = "booked"; // treated as no‑show (never checked in or cancelled)
+        }
       }
 
-      const totalAmount = (b % 2 ? 100 : 150) * 2;
+      const totalAmount = (b % 2 ? 100 : 150) * nights;
       const checkInDate = new Date(ci);
       const hoursUntilCheckIn = (checkInDate - now) / 36e5;
       const penaltyAmount = hoursUntilCheckIn <= 24 ? totalAmount * 0.5 : 0;
@@ -648,6 +661,27 @@ async function seed() {
         totalRevenue: 8000 + i * 400,
         occupancyRate: 0.7 - i * 0.02,
         cancellationCount: 2 + (i % 2),
+      });
+    }
+  }
+
+  /* 6. seed some To‑Dos per hotel for testing */
+  console.log("✨ Seed To‑Dos");
+  const todoTemplates = [
+    "Send deposit reminders to high‑risk bookings",
+    "Adjust pricing +5% for next weekend",
+    "Upsell breakfast at check‑in",
+    "Review cancellations from last week",
+  ];
+  for (const hotelID of hotelIDs) {
+    const n = 2 + Math.floor(rand() * 3);
+    for (let i = 0; i < n; i++) {
+      await add("adminTodos", {
+        hotelID,
+        text: todoTemplates[(i + Math.floor(rand() * 10)) % todoTemplates.length],
+        completed: rand() < 0.3,
+        createdAt: admin.firestore.Timestamp.fromDate(new Date(Date.now() - Math.floor(rand() * 7) * 864e5)),
+        createdBy: sysAdmin.uid,
       });
     }
   }

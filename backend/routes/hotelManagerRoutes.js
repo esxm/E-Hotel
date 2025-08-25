@@ -88,6 +88,80 @@ router.get(
   }
 );
 
+// Manager To-Do (shared with adminTodos collection)
+router.get(
+  "/:hotelId/todos",
+  role("HotelManager", "SystemAdmin"),
+  async (req, res) => {
+    try {
+      const snap = await db
+        .collection("adminTodos")
+        .where("hotelID", "==", req.params.hotelId)
+        .get();
+      const list = snap.docs
+        .map((d) => ({ todoID: d.id, ...d.data(), createdAt: d.data().createdAt?.toDate?.() || null }))
+        .sort((a, b) => (b.createdAt?.getTime?.() || 0) - (a.createdAt?.getTime?.() || 0));
+      res.json(list);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch todos" });
+    }
+  }
+);
+
+router.post(
+  "/:hotelId/todos",
+  role("HotelManager", "SystemAdmin"),
+  async (req, res) => {
+    try {
+      const text = (req.body.text || "").toString().trim();
+      if (!text) return res.status(400).json({ error: "Text required" });
+      const payload = {
+        hotelID: req.params.hotelId,
+        text,
+        completed: false,
+        createdAt: admin.firestore.Timestamp.now(),
+        createdBy: req.user?.uid || null,
+      };
+      const ref = await db.collection("adminTodos").add(payload);
+      const doc = await ref.get();
+      res.status(201).json({ todoID: ref.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate?.() || null });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create todo" });
+    }
+  }
+);
+
+router.patch(
+  "/todos/:todoId",
+  role("HotelManager", "SystemAdmin"),
+  async (req, res) => {
+    try {
+      const updates = {};
+      if (typeof req.body.text === "string") updates.text = req.body.text;
+      if (typeof req.body.completed === "boolean") updates.completed = req.body.completed;
+      updates.updatedAt = admin.firestore.Timestamp.now();
+      await db.collection("adminTodos").doc(req.params.todoId).update(updates);
+      const doc = await db.collection("adminTodos").doc(req.params.todoId).get();
+      res.json({ todoID: doc.id, ...doc.data(), createdAt: doc.data().createdAt?.toDate?.() || null });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update todo" });
+    }
+  }
+);
+
+router.delete(
+  "/todos/:todoId",
+  role("HotelManager", "SystemAdmin"),
+  async (req, res) => {
+    try {
+      await db.collection("adminTodos").doc(req.params.todoId).delete();
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete todo" });
+    }
+  }
+);
+
 // List receptionists for a hotel
 router.get(
   "/:hotelId/receptionists",

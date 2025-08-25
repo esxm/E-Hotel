@@ -8,7 +8,7 @@ const router = express.Router({ mergeParams: true });
 router.use(auth);
 
 // check‑in
-router.post("/:bookingId/checkin", role("Receptionist"), async (req, res) => {
+router.post("/:bookingId/checkin", role("Receptionist", "SystemAdmin"), async (req, res) => {
   try {
     await chkCtrl.checkIn(req, res);
   } catch (error) {
@@ -21,7 +21,7 @@ router.post("/:bookingId/checkin", role("Receptionist"), async (req, res) => {
 });
 
 // check‑out
-router.post("/:bookingId/checkout", role("Receptionist"), async (req, res) => {
+router.post("/:bookingId/checkout", role("Receptionist", "SystemAdmin"), async (req, res) => {
   try {
     await chkCtrl.checkOut(req, res);
   } catch (error) {

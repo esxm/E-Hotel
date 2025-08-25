@@ -109,7 +109,7 @@ router.post(
 );
 
 // Check-in route (only for receptionists)
-router.post("/:bookingId/checkin", role("Receptionist"), async (req, res) => {
+router.post("/:bookingId/checkin", role("Receptionist", "SystemAdmin"), async (req, res) => {
   try {
     await bookingCtrl.checkInBooking(req, res);
   } catch (error) {
@@ -122,7 +122,7 @@ router.post("/:bookingId/checkin", role("Receptionist"), async (req, res) => {
 });
 
 // Check-out route (only for receptionists)
-router.post("/:bookingId/checkout", role("Receptionist"), async (req, res) => {
+router.post("/:bookingId/checkout", role("Receptionist", "SystemAdmin"), async (req, res) => {
   try {
     await bookingCtrl.checkOutBooking(req, res);
   } catch (error) {

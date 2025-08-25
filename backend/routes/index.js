@@ -12,6 +12,7 @@ const invoiceRoutes = require("./invoiceRoutes");
 const serviceResourceRoutes = require("./serviceResourceRoutes");
 const serviceBookingRoutes = require("./serviceBookingRoutes");
 const adminRoutes = require("./adminRoutes");
+const aiRoutes = require("./aiRoutes");
 
 const router = express.Router();
 
@@ -37,5 +38,6 @@ router.use("/invoices", invoiceRoutes);
 router.use("/service-resources", serviceResourceRoutes);
 router.use("/service-bookings", serviceBookingRoutes);
 router.use("/admin", adminRoutes);
+router.use("/ai", aiRoutes);
 
 module.exports = router;

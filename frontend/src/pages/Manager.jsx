@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../lib/api";
 import { useLoading } from "../contexts/LoadingContext";
 
@@ -19,6 +19,13 @@ export default function Manager() {
   const [period, setPeriod] = useState({ year: new Date().getFullYear(), month: new Date().getMonth() + 1 });
   const [rooms, setRooms] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [anomalies, setAnomalies] = useState(null);
+  const [forecast, setForecast] = useState(null);
+  const [todos, setTodos] = useState([]);
+  const [todoInput, setTodoInput] = useState("");
+  const [overbookInput, setOverbookInput] = useState({ capacity: '', windowDays: 30 });
+  const [overbookResult, setOverbookResult] = useState(null);
+  const [roomsCount, setRoomsCount] = useState(0);
   const [receptionists, setReceptionists] = useState([]);
   const [recCreateOpen, setRecCreateOpen] = useState(false);
   const [recEditOpen, setRecEditOpen] = useState(false);
@@ -78,6 +85,10 @@ export default function Manager() {
     loadRooms();
     loadBookings();
     buildOverview();
+    fetchAnomalies();
+    fetchForecast();
+    fetchTodos();
+    (async ()=>{ try { const { data: rooms } = await api.get(`/hotels/${activeHotelId}/rooms`); const count = Array.isArray(rooms)?rooms.length:0; setRoomsCount(count); setOverbookInput(p=>({ ...p, capacity: p.capacity || String(count) })); } catch {} })();
     // Do not load receptionists here to avoid unnecessary calls when tab not active
   }, [activeHotelId]);
 
@@ -178,6 +189,38 @@ export default function Manager() {
       }));
     } catch {}
   }
+
+  async function fetchAnomalies() {
+    if (!activeHotelId) return;
+    try {
+      const { data } = await api.get(`/ai/anomalies/${activeHotelId}`, { params: { days: 30 } });
+      setAnomalies(data);
+    } catch (e) {
+      // non-blocking
+    }
+  }
+
+  async function fetchForecast() {
+    if (!activeHotelId) return;
+    try {
+      const { data } = await api.get(`/ai/revenue-forecast`, { params: { hotelId: activeHotelId } });
+      setForecast(data);
+    } catch {}
+  }
+
+  async function fetchTodos() {
+    if (!activeHotelId) return;
+    try { const { data } = await api.get(`/managers/${activeHotelId}/todos`); setTodos(Array.isArray(data)?data:[]); } catch {}
+  }
+
+  // Poll to keep in sync with admin updates
+  useEffect(() => {
+    if (!activeHotelId) return;
+    let timer = setInterval(async () => {
+      try { const { data } = await api.get(`/managers/${activeHotelId}/todos`); setTodos(Array.isArray(data)?data:[]); } catch {}
+    }, 10000);
+    return () => clearInterval(timer);
+  }, [activeHotelId]);
 
   // Room actions
   async function createRoom(e) {
@@ -295,7 +338,7 @@ export default function Manager() {
               </select>
               <button onClick={()=>loadStats()} className="px-3 py-1 rounded bg-blue-600 text-white text-sm">Refresh</button>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
               <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass()}`}><div className="text-xs text-gray-500">Revenue</div><div className="text-2xl font-bold">${(stats?.totalRevenue||0).toLocaleString()}</div></div>
               <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass('warning')}`}><div className="text-xs text-gray-500">Occupancy (current)</div><div className="text-2xl font-bold">{(() => { const total = (overview.roomsAvailable||0) + (overview.roomsOccupied||0) + (overview.roomsBooked||0); const pct = total ? (overview.roomsOccupied/total)*100 : 0; return pct.toFixed(1); })()}%</div></div>
               <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass('cancelled')}`}><div className="text-xs text-gray-500">Cancellations (month)</div><div className="text-2xl font-bold">{stats?.cancellationCount||0}</div></div>
@@ -306,6 +349,124 @@ export default function Manager() {
               <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass('active')}`}><div className="text-xs text-gray-500">Active Bookings</div><div className="text-2xl font-bold">{overview.activeBookings}</div></div>
               <div className={`p-4 rounded bg-white dark:bg-gray-800 border ${metricCardClass('cancelled')}`}><div className="text-xs text-gray-500">Cancelled Bookings</div><div className="text-2xl font-bold">{overview.cancelledBookings}</div></div>
             </div>
+            {forecast && (
+              <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="p-4 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                  <div className="text-xs text-gray-500">Projected Revenue ({forecast.month})</div>
+                  <div className="text-2xl font-bold">${Math.round(forecast.projectedRevenue||0).toLocaleString()}</div>
+                </div>
+                <div className="p-4 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                  <div className="text-xs text-gray-500">Goal</div>
+                  <div className={`text-2xl font-bold ${((forecast.gap||0) > 0)?'text-red-600':'text-green-600'}`}>${Math.round(forecast.goal||0).toLocaleString()}</div>
+                </div>
+                <div className="p-4 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                  <div className="text-xs text-gray-500">Gap</div>
+                  <div className={`text-2xl font-bold ${((forecast.gap||0) > 0)?'text-red-600':'text-green-600'}`}>${Math.round(forecast.gap||0).toLocaleString()}</div>
+                </div>
+              </div>
+            )}
+            {forecast && Array.isArray(forecast.actions) && forecast.actions.length > 0 && (
+              <div className="mt-3 p-4 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+                {forecast.summary && (
+                  <div className="text-sm text-gray-700 dark:text-gray-300 mb-2">{forecast.summary}</div>
+                )}
+                <div className="text-sm font-medium mb-1 text-gray-900 dark:text-white">Recommended actions</div>
+                <ul className="list-disc ml-5 text-sm text-gray-700 dark:text-gray-300">
+                  {forecast.actions.map((a, i) => (
+                    <li key={i}>{a}</li>
+                  ))}
+                </ul>
+                <div className="mt-3">
+                  <button
+                    onClick={() => {
+                      const text = `${forecast.summary || ''}\n\nActions:\n- ${forecast.actions.join('\n- ')}`;
+                      navigator.clipboard.writeText(text).catch(()=>{});
+                    }}
+                    className="px-3 py-2 rounded bg-gray-700 text-white text-sm"
+                  >
+                    Copy Actions
+                  </button>
+                </div>
+              </div>
+            )}
+            {/* Overbooking Simulator */}
+            <div className="mt-4 p-4 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+              <div className="text-sm font-medium text-gray-900 dark:text-white mb-2">Overbooking Risk Simulator</div>
+              <div className="flex flex-wrap items-end gap-2 mb-2">
+                <div>
+                  <label className="block text-xs mb-1">Capacity</label>
+                  <input value={overbookInput.capacity} onChange={(e)=>setOverbookInput(p=>({...p, capacity:e.target.value}))} type="number" min="0" className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" placeholder="Total rooms" />
+                </div>
+                <div>
+                  <label className="block text-xs mb-1">Window (days)</label>
+                  <input value={overbookInput.windowDays} onChange={(e)=>setOverbookInput(p=>({...p, windowDays:e.target.value}))} type="number" min="7" className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={()=>setOverbookInput(p=>({...p, windowDays: 30 }))} className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-xs">30d</button>
+                  <button onClick={()=>setOverbookInput(p=>({...p, windowDays: 60 }))} className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-xs">60d</button>
+                  <button onClick={()=>setOverbookInput(p=>({...p, windowDays: 90 }))} className="px-2 py-1 rounded bg-gray-200 dark:bg-gray-700 text-xs">90d</button>
+                </div>
+                <button onClick={async ()=>{ try { showLoading(); const { data } = await api.post('/ai/overbooking-sim', { hotelId: activeHotelId, capacity: Number(overbookInput.capacity), windowDays: Number(overbookInput.windowDays) }); setOverbookResult(data); } catch {} finally { hideLoading(); } }} className="px-3 py-2 rounded bg-blue-600 text-white">Simulate</button>
+              </div>
+              {overbookResult && (
+                <div className="text-sm text-gray-700 dark:text-gray-300">
+                  <div className="mb-1">Recommended buffer: <span className="font-semibold">{overbookResult.recommendedBuffer}</span> rooms</div>
+                  <div className="mb-1">{overbookResult.rationale}</div>
+                  <div className="mb-1">Inputs: capacity <span className="font-semibold">{overbookInput.capacity||roomsCount}</span>, window {overbookInput.windowDays}d · cancel rate {(Math.round((overbookResult.cancelRate||0)*1000)/10).toFixed(1)}% · no‑show rate {(Math.round((overbookResult.noShowRate||0)*1000)/10).toFixed(1)}%</div>
+                  {Array.isArray(overbookResult.notes) && overbookResult.notes.length>0 && (
+                    <ul className="list-disc ml-5">
+                      {overbookResult.notes.map((n,i)=>(<li key={i}>{n}</li>))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+            {/* To-Do list */}
+            <div className="mt-4 p-4 rounded bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-sm font-medium text-gray-900 dark:text-white">To‑Do</div>
+                <div className="flex items-center gap-2">
+                  <input value={todoInput} onChange={(e)=>setTodoInput(e.target.value)} placeholder="Add a note" className="px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white" />
+                  <button onClick={async ()=>{ const text = todoInput.trim(); if(!text) return; try { const { data } = await api.post(`/managers/${activeHotelId}/todos`, { text }); setTodos(ts=>[data, ...ts]); setTodoInput(''); } catch {} }} className="px-3 py-2 rounded bg-blue-600 text-white text-sm">Add</button>
+                </div>
+              </div>
+              {todos.length === 0 ? (
+                <p className="text-sm text-gray-500">No to‑do items yet.</p>
+              ) : (
+                <ul className="text-sm text-gray-800 dark:text-gray-200 space-y-2">
+                  {todos.map(item => (
+                    <li key={item.todoID} className="flex items-center justify-between border border-gray-200 dark:border-gray-700 rounded px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <input type="checkbox" checked={!!item.completed} onChange={async (e)=>{ try { const { data } = await api.patch(`/managers/todos/${item.todoID}`, { completed: e.target.checked }); setTodos(ts=>ts.map(x=> x.todoID===item.todoID? data : x)); } catch {} }} />
+                        <span className={item.completed ? 'line-through opacity-70' : ''}>{item.text}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button onClick={async ()=>{ const newText = prompt('Edit note', item.text); if(newText===null) return; try { const { data } = await api.patch(`/managers/todos/${item.todoID}`, { text: newText }); setTodos(ts=>ts.map(x=> x.todoID===item.todoID? data : x)); } catch {} }} className="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700">Edit</button>
+                        <button onClick={async ()=>{ try { await api.delete(`/managers/todos/${item.todoID}`); setTodos(ts=>ts.filter(x=>x.todoID!==item.todoID)); } catch {} }} className="text-xs px-2 py-1 rounded bg-gray-200 dark:bg-gray-700">Remove</button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {anomalies && (
+              <div className="mt-4 p-4 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20">
+                <div className="text-sm text-amber-900 dark:text-amber-200 font-medium mb-2">AI Anomaly Insights</div>
+                <div className="text-sm text-amber-900 dark:text-amber-200 mb-2">{anomalies.summary}</div>
+                {Array.isArray(anomalies.series) && anomalies.series.length > 2 && (
+                  <div className="mb-3">
+                    <AnomalySparkline data={anomalies.series} anomalies={anomalies.anomalies||[]} />
+                  </div>
+                )}
+                {Array.isArray(anomalies.anomalies) && anomalies.anomalies.length > 0 && (
+                  <ul className="text-sm list-disc ml-5 text-amber-900 dark:text-amber-200">
+                    {anomalies.anomalies.map((a, idx) => (
+                      <li key={idx}>{a.date}: {a.metric} {a.type} (sev {a.severity}) – {a.reason}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         )}
 
@@ -479,6 +640,37 @@ export default function Manager() {
         )}
       </div>
     </div>
+  );
+}
+
+// Inline sparkline component for anomalies
+function AnomalySparkline({ data, anomalies }) {
+  // data: [{ date, bookings, cancels }]
+  // map to x/y
+  const points = useMemo(() => {
+    const vals = data.map(d => d.bookings);
+    const min = Math.min(...vals, 0);
+    const max = Math.max(...vals, 1);
+    const w = 500;
+    const h = 80;
+    const pad = 6;
+    const scaleX = (i) => pad + (i * (w - pad * 2)) / Math.max(1, data.length - 1);
+    const scaleY = (v) => h - pad - ((v - min) / Math.max(1, max - min)) * (h - pad * 2);
+    const path = data.map((d, i) => `${i === 0 ? 'M' : 'L'}${scaleX(i)},${scaleY(d.bookings)}`).join(' ');
+    const circles = data.map((d, i) => ({ x: scaleX(i), y: scaleY(d.bookings), date: d.date, v: d.bookings }));
+    // mark anomaly dates
+    const anomalyDates = new Set((anomalies||[]).map(a => a.date));
+    const marks = circles.filter(c => anomalyDates.has(c.date));
+    return { w, h, path, marks, min, max };
+  }, [data, anomalies]);
+
+  return (
+    <svg width={points.w} height={points.h} viewBox={`0 0 ${points.w} ${points.h}`} className="block">
+      <path d={points.path} fill="none" stroke="#2563eb" strokeWidth="2" />
+      {points.marks.map((m, idx) => (
+        <circle key={idx} cx={m.x} cy={m.y} r="3" fill="#dc2626" />
+      ))}
+    </svg>
   );
 }
 

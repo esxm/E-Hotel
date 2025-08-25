@@ -1,0 +1,105 @@
+﻿flowchart TB
+  Customer(["Customer"]):::actor
+  Receptionist(["Receptionist"]):::actor
+  Manager(["Hotel Manager"]):::actor
+  Admin(["SystemAdmin"]):::actor
+
+  subgraph "Customer's Activities"
+    C_Browse["Browse rooms & availability"]
+    C_Book["Create booking"]
+    C_Cancel["Cancel booking"]
+    C_ViewInvoice["View invoice"]
+    C_ServiceBook["Book service"]
+    C_ServiceCancel["Cancel service booking"]
+    C_CheckAvail["Check room availability"]
+    C_Penalty["Penalty handling"]
+  end
+
+  subgraph "Receptionist's Activities"
+    R_CreateBooking["Create booking (for guest)"]
+    R_CancelBooking["Cancel booking"]
+    R_CheckIn["Check-in guest"]
+    R_CheckOut["Check-out guest"]
+    R_InvoiceOps["Generate/update invoice"]
+    R_ServiceBook["Book service"]
+    R_ServiceCancel["Cancel service booking"]
+    R_GuestHistory["View guest history"]
+    R_MaintReq["Log maintenance request"]
+    R_UpdateRoom["Update room status"]
+    R_GenInvoice["Generate invoice"]
+  end
+
+  subgraph "Manager's Activities"
+    M_ManageHotel["Manage hotel"]
+    M_ManageRooms["Manage rooms (pricing/type/status)"]
+    M_ManageServices["Manage services"]
+    M_ManageCapacity["Manage capacity & resources"]
+    M_Analytics["View hotel analytics"]
+    M_SetCapacity["Set service capacity"]
+    M_ResMgmt["Manage service resources"]
+  end
+
+  subgraph "Admin's Activities"
+    A_Users["Manage users & roles"]
+    A_Hotels["Manage hotels & assignments"]
+    A_Analytics["View system analytics (time-series)"]
+    A_Maint["Review maintenance"]
+  end
+
+  subgraph "AI Features"
+    AI_Risk["AI: Cancellation risk"]
+    AI_Anom["AI: Detect anomalies"]
+    AI_Revenue["AI: Revenue coaching"]
+    AI_Overbook["AI: Overbooking buffer"]
+  end
+
+  Customer --> C_Browse
+  Customer --> C_Book
+  Customer --> C_Cancel
+  Customer --> C_ViewInvoice
+  Customer --> C_ServiceBook
+  Customer --> C_ServiceCancel
+
+  Receptionist --> R_CreateBooking
+  Receptionist --> R_CancelBooking
+  Receptionist --> R_CheckIn
+  Receptionist --> R_CheckOut
+  Receptionist --> R_InvoiceOps
+  Receptionist --> R_ServiceBook
+  Receptionist --> R_ServiceCancel
+  Receptionist --> R_GuestHistory
+  Receptionist --> R_MaintReq
+  Receptionist --> AI_Risk
+
+  Manager --> M_ManageHotel
+  Manager --> M_ManageRooms
+  Manager --> M_ManageServices
+  Manager --> M_ManageCapacity
+  Manager --> M_Analytics
+  Manager --> AI_Risk
+  Manager --> AI_Anom
+  Manager --> AI_Revenue
+  Manager --> AI_Overbook
+
+  Admin --> A_Users
+  Admin --> A_Hotels
+  Admin --> A_Analytics
+  Admin --> A_Maint
+  Admin --> AI_Anom
+  Admin --> AI_Revenue
+
+  C_Book -. "include" .-> C_CheckAvail
+  C_Cancel -. "include" .-> C_Penalty
+
+  R_CheckIn -. "include" .-> R_UpdateRoom
+  R_CheckOut -. "include" .-> R_GenInvoice
+
+  M_ManageCapacity -. "include" .-> M_SetCapacity
+  M_ManageCapacity -. "include" .-> M_ResMgmt
+
+  R_ServiceBook -. "include (capacity check)" .-> M_SetCapacity
+  R_ServiceBook -. "include (resource reserve)" .-> M_ResMgmt
+
+  C_ServiceBook -. "include (capacity check)" .-> M_SetCapacity
+
+  classDef actor fill:#ffffff,stroke:#111111,stroke-width:1px
